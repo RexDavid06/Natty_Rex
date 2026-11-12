@@ -26,9 +26,11 @@ coverage/
 .env.*.local
 .env.*
 !.env.example
+!.env.production
 
 # OS / editors
 .DS_Store
 .idea/
 .vscode/
 *.log
+.neon

@@ -58,7 +58,7 @@ Render looks for a `Dockerfile` at the repository root by default, so the root `
 1. Create a **Web Service** from this repository and choose **Docker**.
 2. Leave **Root Directory** empty and **Dockerfile Path** as `Dockerfile` (the repository root).
 3. Set **Health Check Path** to `/health/`.
-4. Create a **PostgreSQL** instance and set `DATABASE_URL` to its internal connection string.
+4. Create a **PostgreSQL** instance (or use Neon, below) and set `DATABASE_URL` to its connection string.
 5. Add environment variables:
 
 ```dotenv
@@ -66,10 +66,13 @@ DEBUG=False
 SECRET_KEY=<64+ random characters>
 ALLOWED_HOSTS=nattyrex-backend.onrender.com
 DATABASE_URL=postgres://...
+DATABASE_URL_UNPOOLED=postgres://...
 FRONTEND_URL=https://<your-frontend-host>
 CORS_ALLOWED_ORIGINS=https://<your-frontend-host>
 CSRF_TRUSTED_ORIGINS=https://<your-frontend-host>
 ```
+
+On Neon, use the pooled connection string (host contains `-pooler`) for `DATABASE_URL` and the direct one for `DATABASE_URL_UNPOOLED`. The entrypoint automatically runs migrations over the direct connection and serves requests over the pooled one. If `DATABASE_URL_UNPOOLED` is unset, migrations fall back to `DATABASE_URL`.
 
 `SECURE_SSL_REDIRECT` defaults to `True` when `DEBUG=False`, which is correct behind Render's HTTPS proxy. Attach a persistent disk mounted at `/app/media` if uploaded videos must survive deploys.
 

@@ -91,9 +91,13 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-if env("DATABASE_URL"):
+if database_url := env("DATABASE_URL"):
     DATABASES = {"default": env.db("DATABASE_URL")}
     DATABASES["default"]["CONN_MAX_AGE"] = 60
+    if "-pooler" in database_url:
+        # PgBouncer transaction pooling (Neon pooled connections) cannot keep
+        # server-side cursors open between transactions.
+        DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
 else:
     DATABASES = {
         "default": {
