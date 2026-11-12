@@ -1,0 +1,16 @@
+Django==5.2.18
+djangorestframework==3.18.3
+djangorestframework-simplejwt==5.5.1
+django-cors-headers==4.0.0
+django-environ==0.11.0
+drf-spectacular==0.30.0
+psycopg[binary]==3.2.10
+whitenoise==6.5.0
+gunicorn==23.0.0
+
+# Optional object storage for exercise videos in production
+# django-storages[s3]==1.14.6
+# boto3==1.39.0
+
+# Optional email delivery
+# django-anymail==13.0

@@ -1,0 +1,84 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+  body {
+    @apply bg-ink-950 text-white antialiased;
+    font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+    background-image: radial-gradient(ellipse at 10% -10%, rgba(198, 249, 74, 0.07), transparent 45%),
+      radial-gradient(ellipse at 100% 0%, rgba(198, 249, 74, 0.04), transparent 40%);
+    background-attachment: fixed;
+  }
+  ::selection {
+    @apply bg-lime-400 text-ink-950;
+  }
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-ink-600;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: "Space Grotesk", "Inter", system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  .surface {
+    @apply rounded-2xl border border-white/[0.07] bg-ink-850/80 backdrop-blur-sm;
+  }
+  .surface-hover {
+    @apply transition hover:border-white/[0.13] hover:bg-ink-800/80;
+  }
+  .label {
+    @apply mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-white/45;
+  }
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lime-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-ink-950;
+  }
+  .stat-value {
+    @apply font-display text-3xl font-semibold tracking-tight text-white;
+  }
+  .grid-faint {
+    background-image: linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+  .safe-bottom {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
