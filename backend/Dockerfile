@@ -18,7 +18,8 @@ COPY . .
 RUN addgroup --system app \
     && adduser --system --ingroup app app \
     && mkdir -p /app/media /app/staticfiles \
-    && chown -R app:app /app
+    && chown -R app:app /app \
+    && chmod +x /app/entrypoint.sh
 
 USER app
 
@@ -27,4 +28,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD curl -fsS http://localhost:8000/health/ || exit 1
 
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]

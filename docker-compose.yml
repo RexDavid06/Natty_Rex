@@ -41,13 +41,6 @@ services:
       EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
       EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
-    command:
-      - sh
-      - -c
-      - |
-        python manage.py migrate --noinput
-        python manage.py collectstatic --noinput
-        gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --timeout 120 --access-logfile - --error-logfile -
     volumes:
       - media_data:/app/media
 

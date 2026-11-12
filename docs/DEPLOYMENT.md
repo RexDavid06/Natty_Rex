@@ -51,6 +51,36 @@ docker compose logs -f --tail=100
 curl http://localhost/health/
 ```
 
+### Render (backend API)
+
+Render looks for a `Dockerfile` at the repository root by default, so the root `Dockerfile` builds the backend. The entrypoint runs migrations and `collectstatic` before Gunicorn starts.
+
+1. Create a **Web Service** from this repository and choose **Docker**.
+2. Leave **Root Directory** empty and **Dockerfile Path** as `Dockerfile` (the repository root).
+3. Set **Health Check Path** to `/health/`.
+4. Create a **PostgreSQL** instance and set `DATABASE_URL` to its internal connection string.
+5. Add environment variables:
+
+```dotenv
+DEBUG=False
+SECRET_KEY=<64+ random characters>
+ALLOWED_HOSTS=nattyrex-backend.onrender.com
+DATABASE_URL=postgres://...
+FRONTEND_URL=https://<your-frontend-host>
+CORS_ALLOWED_ORIGINS=https://<your-frontend-host>
+CSRF_TRUSTED_ORIGINS=https://<your-frontend-host>
+```
+
+`SECURE_SSL_REDIRECT` defaults to `True` when `DEBUG=False`, which is correct behind Render's HTTPS proxy. Attach a persistent disk mounted at `/app/media` if uploaded videos must survive deploys.
+
+Provision the trainer from the Render shell:
+
+```bash
+python manage.py create_trainer --email trainer@example.com --name "Coach Rex"
+```
+
+Deploy the frontend separately as a Static Site (build command `npm ci && npm run build`, publish directory `dist`) with `VITE_API_URL=https://nattyrex-backend.onrender.com/api/v1`.
+
 ## 3. Provision the trainer
 
 ```bash
