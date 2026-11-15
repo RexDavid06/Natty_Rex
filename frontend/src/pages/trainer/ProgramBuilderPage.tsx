@@ -58,6 +58,7 @@ import {
   Textarea,
 } from "../../components/ui";
 import { cn, formatDate, titleCase } from "../../lib/utils";
+import { useDraftState, usePersistentState } from "../../lib/persistence/usePersistentState";
 
 const MUSCLE_GROUPS = [
   ["CHEST", "Chest"], ["BACK", "Back"], ["SHOULDERS", "Shoulders"], ["BICEPS", "Biceps"],
@@ -78,8 +79,10 @@ export function ProgramBuilderPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [weekNumber, setWeekNumber] = useState(1);
-  const [selectedDayId, setSelectedDayId] = useState<string | null>(null);
+  const [view, setView] = usePersistentState<{ weekNumber: number; selectedDayId: string | null }>(
+    `trainer.program.${id}.view`,
+    { weekNumber: 1, selectedDayId: null },
+  );
   const [assignOpen, setAssignOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [copyWeekOpen, setCopyWeekOpen] = useState(false);
@@ -102,13 +105,23 @@ export function ProgramBuilderPage() {
     queryClient.invalidateQueries({ queryKey: ["programs"] });
   };
 
+  const weekNumber = program
+    ? Math.min(Math.max(1, view.weekNumber), program.weeks_duration)
+    : view.weekNumber;
   const week: WorkoutWeek | undefined = program?.weeks.find((item) => item.week_number === weekNumber) ?? program?.weeks[0];
   const days = week?.days ?? [];
-  const selectedDay = days.find((day) => day.id === selectedDayId) ?? days[0];
+  const selectedDay = days.find((day) => day.id === view.selectedDayId) ?? days[0];
 
   useEffect(() => {
-    if (!selectedDayId && days.length) setSelectedDayId(days[0].id);
-  }, [days, selectedDayId]);
+    if (!program) return;
+    const nextWeek = Math.min(Math.max(1, view.weekNumber), program.weeks_duration);
+    const nextDays = program.weeks.find((item) => item.week_number === nextWeek)?.days ?? [];
+    const dayExists = Boolean(view.selectedDayId && nextDays.some((day) => day.id === view.selectedDayId));
+    const nextDayId = dayExists ? view.selectedDayId : nextDays[0]?.id ?? null;
+    if (nextWeek !== view.weekNumber || nextDayId !== view.selectedDayId) {
+      setView({ weekNumber: nextWeek, selectedDayId: nextDayId });
+    }
+  }, [program, setView, view.selectedDayId, view.weekNumber]);
 
   const patchDay = useMutation({
     mutationFn: ({ dayId, body }: { dayId: string; body: Record<string, unknown> }) => api.patch(`/days/${dayId}/`, body),
@@ -208,10 +221,7 @@ export function ProgramBuilderPage() {
             return (
               <button
                 key={number}
-                onClick={() => {
-                  setWeekNumber(number);
-                  setSelectedDayId(null);
-                }}
+                onClick={() => setView({ weekNumber: number, selectedDayId: null })}
                 className={cn(
                   "shrink-0 rounded-xl px-3.5 py-2 text-xs font-semibold transition",
                   weekNumber === number ? "bg-lime-400 text-ink-950" : "bg-white/[0.04] text-white/45 hover:bg-white/[0.08]",
@@ -237,7 +247,7 @@ export function ProgramBuilderPage() {
             {days.map((day) => (
               <button
                 key={day.id}
-                onClick={() => setSelectedDayId(day.id)}
+                onClick={() => setView((current) => ({ ...current, selectedDayId: day.id }))}
                 className={cn(
                   "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition",
                   selectedDay?.id === day.id
@@ -335,8 +345,12 @@ export function ProgramBuilderPage() {
           onSaved={refresh}
         />
       )}
-      <EditExerciseModal exercise={editExercise} onClose={() => setEditExercise(null)} onSaved={refresh} />
-      <EditSessionModal session={editSession} onClose={() => setEditSession(null)} onSaved={refresh} />
+      {editExercise && (
+        <EditExerciseModal exercise={editExercise} onClose={() => setEditExercise(null)} onSaved={refresh} />
+      )}
+      {editSession && (
+        <EditSessionModal session={editSession} onClose={() => setEditSession(null)} onSaved={refresh} />
+      )}
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
@@ -557,7 +571,12 @@ function AssignClientsModal({ open, onClose, program, onAssigned }: { open: bool
 
 function SettingsModal({ open, onClose, program, onSaved }: { open: boolean; onClose: () => void; program: ProgramDetail; onSaved: () => void }) {
   const { toast } = useToast();
-  const [form, setForm] = useState({
+  const {
+    value: form,
+    setValue: setForm,
+    restored: draftRestored,
+    clear: clearFormDraft,
+  } = useDraftState(`trainer.program.${program.id}.settings`, {
     name: program.name,
     description: program.description,
     objective: program.objective,
@@ -569,6 +588,7 @@ function SettingsModal({ open, onClose, program, onSaved }: { open: boolean; onC
   const mutation = useMutation({
     mutationFn: () => api.patch(`/programs/${program.id}/`, { ...form, end_date: form.end_date || null }),
     onSuccess: () => {
+      clearFormDraft();
       onSaved();
       onClose();
       toast("Program updated.");
@@ -598,9 +618,16 @@ function SettingsModal({ open, onClose, program, onSaved }: { open: boolean; onC
             <Input type="number" min={1} max={104} value={form.weeks_duration} onChange={(e) => setForm({ ...form, weeks_duration: Number(e.target.value) })} required />
           </Field>
         </div>
-        <div className="flex justify-end gap-2 border-t border-white/[0.06] pt-4">
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" loading={mutation.isPending}>Save settings</Button>
+        <div className="flex items-center justify-between gap-2 border-t border-white/[0.06] pt-4">
+          <div>
+            {draftRestored && (
+              <Button type="button" variant="ghost" size="sm" onClick={clearFormDraft}>Discard draft</Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button type="submit" loading={mutation.isPending}>Save settings</Button>
+          </div>
         </div>
       </form>
     </Modal>
@@ -681,12 +708,15 @@ function CopyDayModal({ open, onClose, program, target, onCopied }: { open: bool
 
 function AddSessionModal({ open, onClose, day, onSaved }: { open: boolean; onClose: () => void; day: WorkoutDay; onSaved: () => void }) {
   const { toast } = useToast();
-  const [title, setTitle] = useState("");
-  const [notes, setNotes] = useState("");
-  useEffect(() => { if (open) { setTitle(""); setNotes(""); } }, [open]);
+  const {
+    value: form,
+    setValue: setForm,
+    clear: clearFormDraft,
+  } = useDraftState(`trainer.day.${day.id}.new-session`, { title: "", notes: "" });
   const mutation = useMutation({
-    mutationFn: () => api.post(`/days/${day.id}/sessions/`, { title, notes }),
+    mutationFn: () => api.post(`/days/${day.id}/sessions/`, form),
     onSuccess: () => {
+      clearFormDraft();
       onSaved();
       onClose();
       toast("Workout session added.");
@@ -697,10 +727,10 @@ function AddSessionModal({ open, onClose, day, onSaved }: { open: boolean; onClo
     <Modal open={open} onClose={onClose} title={`Add workout · ${day.day_name}`} size="sm">
       <form onSubmit={(event) => { event.preventDefault(); mutation.mutate(); }} className="space-y-4">
         <Field label="Session title">
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Chest & Triceps" required autoFocus />
+          <Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Chest & Triceps" required autoFocus />
         </Field>
         <Field label="Session notes">
-          <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Focus cues, intensity target…" className="min-h-[70px]" />
+          <Textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder="Focus cues, intensity target…" className="min-h-[70px]" />
         </Field>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
@@ -711,19 +741,20 @@ function AddSessionModal({ open, onClose, day, onSaved }: { open: boolean; onClo
   );
 }
 
-function EditSessionModal({ session, onClose, onSaved }: { session: WorkoutSession | null; onClose: () => void; onSaved: () => void }) {
+function EditSessionModal({ session, onClose, onSaved }: { session: WorkoutSession; onClose: () => void; onSaved: () => void }) {
   const { toast } = useToast();
-  const [title, setTitle] = useState("");
-  const [notes, setNotes] = useState("");
-  useEffect(() => {
-    if (session) {
-      setTitle(session.title);
-      setNotes(session.notes);
-    }
-  }, [session]);
+  const {
+    value: form,
+    setValue: setForm,
+    clear: clearFormDraft,
+  } = useDraftState(`trainer.session.${session.id}.edit`, {
+    title: session.title,
+    notes: session.notes,
+  });
   const mutation = useMutation({
-    mutationFn: () => api.patch(`/sessions/${session?.id}/`, { title, notes }),
+    mutationFn: () => api.patch(`/sessions/${session.id}/`, form),
     onSuccess: () => {
+      clearFormDraft();
       onSaved();
       onClose();
       toast("Session updated.");
@@ -731,10 +762,10 @@ function EditSessionModal({ session, onClose, onSaved }: { session: WorkoutSessi
     onError: (error) => toast(error instanceof ApiError ? error.message : "Could not update session.", "error"),
   });
   return (
-    <Modal open={Boolean(session)} onClose={onClose} title="Edit workout session" size="sm">
+    <Modal open onClose={onClose} title="Edit workout session" size="sm">
       <form onSubmit={(event) => { event.preventDefault(); mutation.mutate(); }} className="space-y-4">
-        <Field label="Session title"><Input value={title} onChange={(event) => setTitle(event.target.value)} required /></Field>
-        <Field label="Notes"><Textarea value={notes} onChange={(event) => setNotes(event.target.value)} /></Field>
+        <Field label="Session title"><Input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required /></Field>
+        <Field label="Notes"><Textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></Field>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
           <Button type="submit" loading={mutation.isPending}>Save</Button>
@@ -746,35 +777,47 @@ function EditSessionModal({ session, onClose, onSaved }: { session: WorkoutSessi
 
 function AddExerciseModal({ open, onClose, session, onSaved }: { open: boolean; onClose: () => void; session: WorkoutSession; onSaved: () => void }) {
   const { toast } = useToast();
-  const [tab, setTab] = useState<"library" | "custom">("library");
-  const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<string[]>([]);
-  const [sets, setSets] = useState("3");
-  const [reps, setReps] = useState("10");
-  const [rest, setRest] = useState("60");
-  const [weight, setWeight] = useState("");
-  const [custom, setCustom] = useState({
-    exercise_name: "",
-    muscle_group: "CHEST",
-    category: "STRENGTH",
-    instructions: "",
+  const {
+    value: draft,
+    setValue: setDraft,
+    clear: clearDraft,
+  } = useDraftState(`trainer.session.${session.id}.add-exercise`, {
+    tab: "library" as "library" | "custom",
+    search: "",
+    selected: [] as string[],
     sets: "3",
     reps: "10",
-    rest_seconds: "60",
+    rest: "60",
+    weight: "",
+    custom: {
+      exercise_name: "",
+      muscle_group: "CHEST",
+      category: "STRENGTH",
+      instructions: "",
+      sets: "3",
+      reps: "10",
+      rest_seconds: "60",
+    },
   });
+  const { tab, search, selected, sets, reps, rest, weight, custom } = draft;
+  const setTab = (next: "library" | "custom") => setDraft((current) => ({ ...current, tab: next }));
+  const setSearch = (next: string) => setDraft((current) => ({ ...current, search: next }));
+  const setSelected = (next: string[] | ((current: string[]) => string[])) =>
+    setDraft((current) => ({
+      ...current,
+      selected: typeof next === "function" ? next(current.selected) : next,
+    }));
+  const setSets = (next: string) => setDraft((current) => ({ ...current, sets: next }));
+  const setReps = (next: string) => setDraft((current) => ({ ...current, reps: next }));
+  const setRest = (next: string) => setDraft((current) => ({ ...current, rest: next }));
+  const setWeight = (next: string) => setDraft((current) => ({ ...current, weight: next }));
+  const setCustom = (next: typeof custom) => setDraft((current) => ({ ...current, custom: next }));
 
   const { data, isLoading } = useQuery({
     queryKey: ["exercise-library", search],
     queryFn: () => api.get<Paginated<Exercise>>(`/exercises/?page_size=100&q=${encodeURIComponent(search)}`),
     enabled: open,
   });
-
-  useEffect(() => {
-    if (open) {
-      setSelected([]);
-      setTab("library");
-    }
-  }, [open]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -800,6 +843,7 @@ function AddExerciseModal({ open, onClose, session, onSaved }: { open: boolean; 
       }
     },
     onSuccess: () => {
+      clearDraft();
       onSaved();
       onClose();
       toast(tab === "custom" ? "Exercise added." : `${selected.length} exercise${selected.length === 1 ? "" : "s"} added.`);
@@ -895,45 +939,35 @@ function AddExerciseModal({ open, onClose, session, onSaved }: { open: boolean; 
   );
 }
 
-function EditExerciseModal({ exercise, onClose, onSaved }: { exercise: WorkoutExercise | null; onClose: () => void; onSaved: () => void }) {
+function EditExerciseModal({ exercise, onClose, onSaved }: { exercise: WorkoutExercise; onClose: () => void; onSaved: () => void }) {
   const { toast } = useToast();
-  const [form, setForm] = useState({
-    exercise_name: "",
-    muscle_group: "CHEST",
-    category: "STRENGTH",
-    sets: "3",
-    reps: "10",
-    weight: "",
-    rest_seconds: "60",
-    tempo: "",
-    instructions: "",
-    trainer_notes: "",
+  const {
+    value: form,
+    setValue: setForm,
+    restored: draftRestored,
+    clear: clearFormDraft,
+  } = useDraftState(`trainer.workout-exercise.${exercise.id}.edit`, {
+    exercise_name: exercise.exercise_name,
+    muscle_group: exercise.muscle_group,
+    category: exercise.category || "STRENGTH",
+    sets: String(exercise.sets),
+    reps: exercise.reps,
+    weight: exercise.weight ?? "",
+    rest_seconds: String(exercise.rest_seconds),
+    tempo: exercise.tempo,
+    instructions: exercise.instructions,
+    trainer_notes: exercise.trainer_notes,
   });
-  useEffect(() => {
-    if (exercise) {
-      setForm({
-        exercise_name: exercise.exercise_name,
-        muscle_group: exercise.muscle_group,
-        category: exercise.category || "STRENGTH",
-        sets: String(exercise.sets),
-        reps: exercise.reps,
-        weight: exercise.weight ?? "",
-        rest_seconds: String(exercise.rest_seconds),
-        tempo: exercise.tempo,
-        instructions: exercise.instructions,
-        trainer_notes: exercise.trainer_notes,
-      });
-    }
-  }, [exercise]);
   const mutation = useMutation({
     mutationFn: () =>
-      api.patch(`/workout-exercises/${exercise?.id}/`, {
+      api.patch(`/workout-exercises/${exercise.id}/`, {
         ...form,
         sets: Number(form.sets),
         rest_seconds: Number(form.rest_seconds),
         weight: form.weight ? Number(form.weight) : null,
       }),
     onSuccess: () => {
+      clearFormDraft();
       onSaved();
       onClose();
       toast("Exercise prescription updated.");
@@ -941,7 +975,7 @@ function EditExerciseModal({ exercise, onClose, onSaved }: { exercise: WorkoutEx
     onError: (error) => toast(error instanceof ApiError ? error.message : "Could not update exercise.", "error"),
   });
   return (
-    <Modal open={Boolean(exercise)} onClose={onClose} title="Edit exercise prescription" size="lg">
+    <Modal open onClose={onClose} title="Edit exercise prescription" size="lg">
       <form onSubmit={(event) => { event.preventDefault(); mutation.mutate(); }} className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Exercise name"><Input value={form.exercise_name} onChange={(e) => setForm({ ...form, exercise_name: e.target.value })} required /></Field>
@@ -960,9 +994,16 @@ function EditExerciseModal({ exercise, onClose, onSaved }: { exercise: WorkoutEx
         </div>
         <Field label="Instructions"><Textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} /></Field>
         <Field label="Trainer notes"><Textarea value={form.trainer_notes} onChange={(e) => setForm({ ...form, trainer_notes: e.target.value })} className="min-h-[70px]" /></Field>
-        <div className="flex justify-end gap-2 border-t border-white/[0.06] pt-4">
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" loading={mutation.isPending}>Save prescription</Button>
+        <div className="flex items-center justify-between gap-2 border-t border-white/[0.06] pt-4">
+          <div>
+            {draftRestored && (
+              <Button type="button" variant="ghost" size="sm" onClick={clearFormDraft}>Discard draft</Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button type="submit" loading={mutation.isPending}>Save prescription</Button>
+          </div>
         </div>
       </form>
     </Modal>

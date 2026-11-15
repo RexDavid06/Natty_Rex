@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
 import { useAuth } from "../../lib/auth";
 import { ApiError } from "../../lib/api";
+import { isRouteForRole, readLastRoute, roleHome } from "../../lib/persistence/storage";
+import type { User } from "../../lib/types";
 import { Button, Field, Input } from "../../components/ui";
 import { AuthLayout } from "../../components/layout/AppLayout";
 import { InstallAppButton } from "../../components/InstallApp";
@@ -11,14 +13,21 @@ import { InstallAppButton } from "../../components/InstallApp";
 export function LoginPage() {
   const { login, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: unknown } | null)?.from;
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const destination = (account: User) => {
+    if (typeof from === "string" && isRouteForRole(account.role, from)) return from;
+    return readLastRoute(account.id, account.role) ?? roleHome(account.role);
+  };
+
   if (user) {
-    navigate(user.role === "TRAINER" ? "/trainer/dashboard" : "/app", { replace: true });
+    return <Navigate to={destination(user)} replace />;
   }
 
   const submit = async (event: React.FormEvent) => {
@@ -27,7 +36,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       const account = await login(identifier.trim(), password);
-      navigate(account.role === "TRAINER" ? "/trainer/dashboard" : "/app", { replace: true });
+      navigate(destination(account), { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Unable to sign in.");
     } finally {

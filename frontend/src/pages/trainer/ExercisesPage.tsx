@@ -31,6 +31,7 @@ import {
   Textarea,
 } from "../../components/ui";
 import { titleCase } from "../../lib/utils";
+import { useDraftState, usePersistentState } from "../../lib/persistence/usePersistentState";
 
 const MUSCLE_GROUPS = [
   ["CHEST", "Chest"], ["BACK", "Back"], ["SHOULDERS", "Shoulders"], ["BICEPS", "Biceps"],
@@ -58,14 +59,16 @@ const emptyForm = {
 export function ExercisesPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [search, setSearch] = useState("");
+  const [filters, setFilters] = usePersistentState("trainer.exercises.filters", {
+    search: "",
+    muscle: "",
+  });
+  const { search, muscle } = filters;
   const deferredSearch = useDeferredValue(search);
-  const [muscle, setMuscle] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Exercise | null>(null);
   const [mediaExercise, setMediaExercise] = useState<Exercise | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Exercise | null>(null);
-  const [form, setForm] = useState(emptyForm);
 
   const { data, isLoading } = useQuery({
     queryKey: ["exercises", deferredSearch, muscle],
@@ -84,39 +87,19 @@ export function ExercisesPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm(emptyForm);
     setFormOpen(true);
   };
 
   const openEdit = (exercise: Exercise) => {
     setEditing(exercise);
-    setForm({
-      name: exercise.name,
-      muscle_group: exercise.muscle_group,
-      category: exercise.category,
-      description: exercise.description,
-      instructions: exercise.instructions,
-      default_sets: exercise.default_sets,
-      default_reps: exercise.default_reps,
-      default_weight: exercise.default_weight ?? "",
-      default_rest_seconds: exercise.default_rest_seconds,
-      tempo: exercise.tempo,
-    });
     setFormOpen(true);
   };
 
-  const saveMutation = useMutation({
-    mutationFn: () => {
-      const payload = { ...form, default_weight: form.default_weight || null };
-      return editing ? api.patch(`/exercises/${editing.id}/`, payload) : api.post("/exercises/", payload);
-    },
-    onSuccess: () => {
-      invalidate();
-      setFormOpen(false);
-      toast(editing ? "Exercise updated." : "Exercise added to library.");
-    },
-    onError: (error) => toast(error instanceof ApiError ? error.message : "Could not save exercise.", "error"),
-  });
+  const onExerciseSaved = () => {
+    invalidate();
+    setFormOpen(false);
+    toast(editing ? "Exercise updated." : "Exercise added to library.");
+  };
 
   const deleteMutation = useMutation({
     mutationFn: () => api.delete(`/exercises/${deleteTarget?.id}/`),
@@ -146,9 +129,18 @@ export function ExercisesPage() {
       <div className="mb-4 flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-white/25" />
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search exercises" className="pl-10" />
+          <Input
+            value={search}
+            onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+            placeholder="Search exercises"
+            className="pl-10"
+          />
         </div>
-        <Select value={muscle} onChange={(event) => setMuscle(event.target.value)} className="sm:w-48">
+        <Select
+          value={muscle}
+          onChange={(event) => setFilters((current) => ({ ...current, muscle: event.target.value }))}
+          className="sm:w-48"
+        >
           <option value="">All muscle groups</option>
           {MUSCLE_GROUPS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </Select>
@@ -225,36 +217,13 @@ export function ExercisesPage() {
         </div>
       )}
 
-      <Modal open={formOpen} onClose={() => setFormOpen(false)} title={editing ? "Edit exercise" : "New exercise"} size="lg">
-        <form onSubmit={(event) => { event.preventDefault(); saveMutation.mutate(); }} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Exercise name"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Barbell back squat" required autoFocus /></Field>
-            <Field label="Muscle group">
-              <Select value={form.muscle_group} onChange={(e) => setForm({ ...form, muscle_group: e.target.value })}>
-                {MUSCLE_GROUPS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </Select>
-            </Field>
-            <Field label="Category">
-              <Select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                {CATEGORIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-              </Select>
-            </Field>
-            <Field label="Tempo"><Input value={form.tempo} onChange={(e) => setForm({ ...form, tempo: e.target.value })} placeholder="3-0-1" /></Field>
-          </div>
-          <Field label="Short description"><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="What the movement trains and why it matters." /></Field>
-          <Field label="Coaching instructions"><Textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} placeholder="Setup, execution, bracing cues, common mistakes…" /></Field>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <Field label="Sets"><Input type="number" min={1} value={form.default_sets} onChange={(e) => setForm({ ...form, default_sets: Number(e.target.value) })} /></Field>
-            <Field label="Reps"><Input value={form.default_reps} onChange={(e) => setForm({ ...form, default_reps: e.target.value })} /></Field>
-            <Field label="Weight"><Input type="number" step="0.5" value={form.default_weight} onChange={(e) => setForm({ ...form, default_weight: e.target.value })} placeholder="—" /></Field>
-            <Field label="Rest (s)"><Input type="number" min={0} value={form.default_rest_seconds} onChange={(e) => setForm({ ...form, default_rest_seconds: Number(e.target.value) })} /></Field>
-          </div>
-          <div className="flex justify-end gap-2 border-t border-white/[0.06] pt-4">
-            <Button type="button" variant="ghost" onClick={() => setFormOpen(false)}>Cancel</Button>
-            <Button type="submit" loading={saveMutation.isPending}>{editing ? "Save exercise" : "Create exercise"}</Button>
-          </div>
-        </form>
-      </Modal>
+      {formOpen && (
+        <ExerciseFormModal
+          exercise={editing}
+          onClose={() => setFormOpen(false)}
+          onSaved={onExerciseSaved}
+        />
+      )}
 
       {mediaExercise && (
         <MediaModal
@@ -274,6 +243,93 @@ export function ExercisesPage() {
         confirmLabel="Delete exercise"
       />
     </div>
+  );
+}
+
+function ExerciseFormModal({
+  exercise,
+  onClose,
+  onSaved,
+}: {
+  exercise: Exercise | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { toast } = useToast();
+  const initial = exercise
+    ? {
+        name: exercise.name,
+        muscle_group: exercise.muscle_group,
+        category: exercise.category,
+        description: exercise.description,
+        instructions: exercise.instructions,
+        default_sets: exercise.default_sets,
+        default_reps: exercise.default_reps,
+        default_weight: exercise.default_weight ?? "",
+        default_rest_seconds: exercise.default_rest_seconds,
+        tempo: exercise.tempo,
+      }
+    : emptyForm;
+  const {
+    value: form,
+    setValue: setForm,
+    restored,
+    clear,
+  } = useDraftState(`trainer.exercise.${exercise?.id ?? "new"}`, initial);
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const payload = { ...form, default_weight: form.default_weight || null };
+      return exercise ? api.patch(`/exercises/${exercise.id}/`, payload) : api.post("/exercises/", payload);
+    },
+    onSuccess: () => {
+      clear();
+      onSaved();
+    },
+    onError: (error) => toast(error instanceof ApiError ? error.message : "Could not save exercise.", "error"),
+  });
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={exercise ? "Edit exercise" : "New exercise"}
+      size="lg"
+    >
+      <form onSubmit={(event) => { event.preventDefault(); saveMutation.mutate(); }} className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Exercise name"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Barbell back squat" required autoFocus /></Field>
+          <Field label="Muscle group">
+            <Select value={form.muscle_group} onChange={(e) => setForm({ ...form, muscle_group: e.target.value })}>
+              {MUSCLE_GROUPS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </Select>
+          </Field>
+          <Field label="Category">
+            <Select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+              {CATEGORIES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </Select>
+          </Field>
+          <Field label="Tempo"><Input value={form.tempo} onChange={(e) => setForm({ ...form, tempo: e.target.value })} placeholder="3-0-1" /></Field>
+        </div>
+        <Field label="Short description"><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="What the movement trains and why it matters." /></Field>
+        <Field label="Coaching instructions"><Textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} placeholder="Setup, execution, bracing cues, common mistakes…" /></Field>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <Field label="Sets"><Input type="number" min={1} value={form.default_sets} onChange={(e) => setForm({ ...form, default_sets: Number(e.target.value) })} /></Field>
+          <Field label="Reps"><Input value={form.default_reps} onChange={(e) => setForm({ ...form, default_reps: e.target.value })} /></Field>
+          <Field label="Weight"><Input type="number" step="0.5" value={form.default_weight} onChange={(e) => setForm({ ...form, default_weight: e.target.value })} placeholder="—" /></Field>
+          <Field label="Rest (s)"><Input type="number" min={0} value={form.default_rest_seconds} onChange={(e) => setForm({ ...form, default_rest_seconds: Number(e.target.value) })} /></Field>
+        </div>
+        <div className="flex items-center justify-between gap-2 border-t border-white/[0.06] pt-4">
+          <div>
+            {restored && <Button type="button" variant="ghost" size="sm" onClick={clear}>Discard draft</Button>}
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button type="submit" loading={saveMutation.isPending}>{exercise ? "Save exercise" : "Create exercise"}</Button>
+          </div>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

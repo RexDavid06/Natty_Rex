@@ -1,6 +1,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { api, tokenStore } from "./api";
+import { api, ApiError, tokenStore } from "./api";
+import { queryClient } from "./query";
+import {
+  cacheUser,
+  clearCachedUser,
+  clearUserScopedState,
+  readCachedUser,
+} from "./persistence/storage";
 import type { AuthResponse, User } from "./types";
 
 interface AuthContextValue {
@@ -14,43 +21,61 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function hasSession() {
+  return Boolean(tokenStore.access() || tokenStore.refresh());
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [initializing, setInitializing] = useState(true);
+  const cachedUser = hasSession() ? readCachedUser() : null;
+  const [user, setUser] = useState<User | null>(cachedUser);
+  const [initializing, setInitializing] = useState(() => hasSession() && !cachedUser);
+
+  const clearSession = useCallback(() => {
+    tokenStore.clear();
+    clearUserScopedState();
+    queryClient.clear();
+    setUser(null);
+  }, []);
+
+  const applyUser = useCallback((next: User | null) => {
+    if (next) cacheUser(next);
+    else clearCachedUser();
+    setUser(next);
+  }, []);
 
   const refreshUser = useCallback(async () => {
-    if (!tokenStore.access() && !tokenStore.refresh()) {
+    if (!hasSession()) {
+      clearCachedUser();
       setUser(null);
       return;
     }
     try {
       const me = await api.get<User>("/auth/me/");
-      setUser(me);
-    } catch {
-      tokenStore.clear();
-      setUser(null);
+      applyUser(me);
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        clearSession();
+      }
     }
-  }, []);
+  }, [applyUser, clearSession]);
 
   useEffect(() => {
     refreshUser().finally(() => setInitializing(false));
   }, [refreshUser]);
 
   useEffect(() => {
-    const handle = () => {
-      tokenStore.clear();
-      setUser(null);
-    };
+    const handle = () => clearSession();
     window.addEventListener("nattyrex:session-expired", handle);
     return () => window.removeEventListener("nattyrex:session-expired", handle);
-  }, []);
+  }, [clearSession]);
 
   const login = useCallback(async (identifier: string, password: string) => {
     const data = await api.anonymousPost<AuthResponse>("/auth/login/", { identifier, password });
     tokenStore.set(data.access, data.refresh);
-    setUser(data.user);
+    queryClient.clear();
+    applyUser(data.user);
     return data.user;
-  }, []);
+  }, [applyUser]);
 
   const acceptInvitation = useCallback(async (token: string, password: string, email?: string) => {
     const data = await api.anonymousPost<AuthResponse>("/auth/invitations/accept/", {
@@ -59,9 +84,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ...(email ? { email } : {}),
     });
     tokenStore.set(data.access, data.refresh);
-    setUser(data.user);
+    queryClient.clear();
+    applyUser(data.user);
     return data.user;
-  }, []);
+  }, [applyUser]);
 
   const logout = useCallback(async () => {
     const refresh = tokenStore.refresh();
@@ -70,9 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // Local sign-out must still succeed if the network is unavailable.
     }
-    tokenStore.clear();
-    setUser(null);
-  }, []);
+    clearSession();
+  }, [clearSession]);
 
   const value = useMemo(
     () => ({ user, initializing, login, acceptInvitation, logout, refreshUser }),

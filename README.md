@@ -17,10 +17,10 @@ Natty_Rex/
 - **Trainer-only provisioning** — there is no public trainer signup. The single trainer account is created with a management command.
 - **Secure invitations** — hashed, single-use, expiring links; raw tokens are only returned once.
 - **Program builder** — weeks, days, multiple sessions per day, drag-to-reorder exercises, copy week/day, assignment to multiple clients.
-- **Exercise library** — reusable prescriptions, coaching cues, uploads or external video/animation URLs, preferred demonstration per exercise.
+- **Exercise library** — 90+ built-in exercises across strength, hypertrophy, cardio, core, mobility and plyometrics, plus reusable prescriptions, coaching cues, uploads or external video/animation URLs and preferred demonstrations.
 - **Client app** — today's workout, calendar, exercise logging, session completion, history and body progress.
 - **Private API** — JWT access/refresh tokens, role-based permissions, trainer/client data isolation.
-- **PWA** — installable app shell, offline fallback, API requests always network-only (private data is never cached).
+- **PWA** — installable app shell, offline fallback, API requests always network-only (private data is never cached), and resumable UI state, drafts, scroll position and last route after backgrounding or process death.
 - **Production stack** — PostgreSQL, Gunicorn, WhiteNoise, nginx, Docker Compose, media volume, health checks.
 
 ## Quick start (local, SQLite)
@@ -55,6 +55,14 @@ python manage.py create_trainer \
 ```
 
 Omit `--password` to be prompted securely. The command refuses to create a second trainer account.
+
+### Seed the exercise library
+
+```bash
+make seed
+```
+
+The idempotent command adds the built-in library to every trainer account that does not already have it. Migrations also seed existing trainers during deployment.
 
 ### Add a client
 
@@ -92,6 +100,7 @@ The frontend runs with `envDir` set to the repository root, so Vite also reads `
 | `make install` | Install Python and npm dependencies |
 | `make migrate` | Apply migrations |
 | `make trainer` | Create/update the private trainer account |
+| `make seed` | Add the built-in exercise library without duplicates |
 | `make dev` | Run API and frontend together |
 | `make backend` / `make frontend` | Run one side only |
 | `make check` | Django checks and TypeScript typecheck |
@@ -143,6 +152,14 @@ This repository was developed in a Termux-like Debian environment:
 - [API reference](docs/API.md)
 - [Deployment and operations](docs/DEPLOYMENT.md)
 - [Testing guide](docs/TESTING.md)
+
+## Recovery and persistence
+
+- UI filters, tabs, expanded exercises and the selected program week/day are restored from per-user session storage.
+- Unsaved program, workout, progress, note and profile forms are saved as per-user drafts for 30 days and survive app backgrounding or restart.
+- Scroll positions are restored per route, and the last valid route is reopened after login or app relaunch.
+- Drafts are cleared after a successful save and removed when the user signs out. Passwords are never persisted in drafts.
+- A PWA update banner prompts before activation; the app never force-reloads during use.
 
 ## Security notes
 

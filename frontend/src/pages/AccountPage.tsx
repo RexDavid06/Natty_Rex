@@ -6,6 +6,7 @@ import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { User } from "../lib/types";
 import { useToast } from "../lib/toast";
+import { useDraftState } from "../lib/persistence/usePersistentState";
 import { PageHeader } from "../components/layout/AppLayout";
 import {
   Avatar,
@@ -22,15 +23,21 @@ export function AccountPage() {
   const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   const fileInput = useRef<HTMLInputElement>(null);
+  const profileInitializedFor = useRef<string | null>(null);
 
-  const [form, setForm] = useState({
-    full_name: "",
-    email: "",
-    phone: "",
-    bio: "",
-    gender: "",
-    date_of_birth: "",
-    fitness_goals: "",
+  const {
+    value: form,
+    setValue: setForm,
+    restored: profileDraftRestored,
+    clear: clearProfileDraft,
+  } = useDraftState(`account.${user?.id ?? "anonymous"}.profile`, {
+    full_name: user?.full_name ?? "",
+    email: user?.email ?? "",
+    phone: user?.phone ?? "",
+    bio: user?.bio ?? "",
+    gender: user?.gender ?? "",
+    date_of_birth: user?.date_of_birth ?? "",
+    fitness_goals: user?.fitness_goals ?? "",
   });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -42,7 +49,8 @@ export function AccountPage() {
   });
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || profileDraftRestored || profileInitializedFor.current === user.id) return;
+    profileInitializedFor.current = user.id;
     setForm({
       full_name: user.full_name ?? "",
       email: user.email ?? "",
@@ -52,7 +60,7 @@ export function AccountPage() {
       date_of_birth: user.date_of_birth ?? "",
       fitness_goals: user.fitness_goals ?? "",
     });
-  }, [user]);
+  }, [profileDraftRestored, setForm, user]);
 
   useEffect(() => {
     return () => {
@@ -112,6 +120,8 @@ export function AccountPage() {
     },
     onSuccess: async () => {
       await refreshUser();
+      clearProfileDraft();
+      profileInitializedFor.current = null;
       setAvatarFile(null);
       setAvatarPreview(null);
       setRemoveAvatar(false);
@@ -253,7 +263,14 @@ export function AccountPage() {
               )}
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                {profileDraftRestored && (
+                  <Button type="button" variant="ghost" size="sm" onClick={clearProfileDraft}>
+                    Discard draft
+                  </Button>
+                )}
+              </div>
               <Button type="submit" loading={profileMutation.isPending}>
                 <Save className="h-4 w-4" /> Save changes
               </Button>

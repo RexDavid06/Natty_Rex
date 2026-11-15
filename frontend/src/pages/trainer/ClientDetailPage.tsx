@@ -39,6 +39,7 @@ import {
 } from "../../components/ui";
 import { InviteLink } from "../../components/trainer/AddClientModal";
 import { cn, formatDate, formatDateTime, pluralize, titleCase } from "../../lib/utils";
+import { useDraftState, usePersistentState } from "../../lib/persistence/usePersistentState";
 
 const tabs = ["Overview", "Programs", "Progress", "Notes"] as const;
 type Tab = (typeof tabs)[number];
@@ -47,13 +48,18 @@ export function ClientDetailPage() {
   const { id = "" } = useParams();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [tab, setTab] = useState<Tab>("Overview");
+  const [storedTab, setStoredTab] = usePersistentState(`trainer.client.${id}.tab`, "Overview");
+  const tab: Tab = (tabs as readonly string[]).includes(storedTab) ? (storedTab as Tab) : "Overview";
   const [editOpen, setEditOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
   const [generatedInvite, setGeneratedInvite] = useState<Invitation | null>(null);
-  const [note, setNote] = useState("");
+  const {
+    value: note,
+    setValue: setNote,
+    clear: clearNoteDraft,
+  } = useDraftState(`trainer.client.${id}.note`, "");
 
   const { data, isLoading } = useQuery({
     queryKey: ["client-overview", id],
@@ -98,7 +104,7 @@ export function ClientDetailPage() {
   const addNote = useMutation({
     mutationFn: () => api.post(`/clients/${id}/notes/`, { body: note }),
     onSuccess: () => {
-      setNote("");
+      clearNoteDraft();
       refresh();
       toast("Note saved.");
     },
@@ -214,7 +220,7 @@ export function ClientDetailPage() {
         {tabs.map((item) => (
           <button
             key={item}
-            onClick={() => setTab(item)}
+            onClick={() => setStoredTab(item)}
             className={cn(
               "shrink-0 rounded-xl px-3.5 py-2 text-xs font-medium transition",
               tab === item ? "bg-lime-400/[0.1] text-lime-300" : "text-white/40 hover:bg-white/[0.04] hover:text-white",
@@ -322,7 +328,7 @@ export function ClientDetailPage() {
                 <Button variant="secondary" className="w-full justify-start" onClick={() => setProgressOpen(true)}>
                   <Plus className="h-4 w-4" /> Record body progress
                 </Button>
-                <Button variant="secondary" className="w-full justify-start" onClick={() => setTab("Notes")}>
+                <Button variant="secondary" className="w-full justify-start" onClick={() => setStoredTab("Notes")}>
                   <Target className="h-4 w-4" /> Add trainer note
                 </Button>
                 <Link to={`/trainer/programs?assign=${assignments[0]?.program.id ?? ""}`}>
@@ -523,7 +529,12 @@ export function ClientDetailPage() {
 
 function EditClientModal({ client, open, onClose, onSaved }: { client: Client; open: boolean; onClose: () => void; onSaved: () => void }) {
   const { toast } = useToast();
-  const [form, setForm] = useState({
+  const {
+    value: form,
+    setValue: setForm,
+    restored: draftRestored,
+    clear: clearFormDraft,
+  } = useDraftState(`trainer.client.${client.client_id}.edit`, {
     full_name: client.full_name,
     email: client.email,
     phone: client.phone,
@@ -535,6 +546,7 @@ function EditClientModal({ client, open, onClose, onSaved }: { client: Client; o
   const mutation = useMutation({
     mutationFn: () => api.patch(`/clients/${client.client_id}/`, { ...form, gender: form.gender || "" }),
     onSuccess: () => {
+      clearFormDraft();
       onSaved();
       onClose();
       toast("Client details updated.");
@@ -580,13 +592,22 @@ function EditClientModal({ client, open, onClose, onSaved }: { client: Client; o
         <Field label="Training notes">
           <Textarea value={form.training_notes} onChange={set("training_notes")} />
         </Field>
-        <div className="flex justify-end gap-2 border-t border-white/[0.06] pt-4">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" loading={mutation.isPending}>
-            Save changes
-          </Button>
+        <div className="flex items-center justify-between gap-2 border-t border-white/[0.06] pt-4">
+          <div>
+            {draftRestored && (
+              <Button type="button" variant="ghost" size="sm" onClick={clearFormDraft}>
+                Discard draft
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={mutation.isPending}>
+              Save changes
+            </Button>
+          </div>
         </div>
       </form>
     </Modal>
@@ -646,7 +667,17 @@ function InviteModal({
 
 function ProgressModal({ open, onClose, clientId, onSaved }: { open: boolean; onClose: () => void; clientId: string; onSaved: () => void }) {
   const { toast } = useToast();
-  const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), weight_kg: "", body_fat_percentage: "", notes: "" });
+  const {
+    value: form,
+    setValue: setForm,
+    restored: draftRestored,
+    clear: clearFormDraft,
+  } = useDraftState(`trainer.client.${clientId}.progress`, {
+    date: new Date().toISOString().slice(0, 10),
+    weight_kg: "",
+    body_fat_percentage: "",
+    notes: "",
+  });
   const mutation = useMutation({
     mutationFn: () =>
       api.post<ProgressEntry>(`/clients/${clientId}/progress/`, {
@@ -656,9 +687,9 @@ function ProgressModal({ open, onClose, clientId, onSaved }: { open: boolean; on
         notes: form.notes,
       }),
     onSuccess: () => {
+      clearFormDraft();
       onSaved();
       onClose();
-      setForm({ date: new Date().toISOString().slice(0, 10), weight_kg: "", body_fat_percentage: "", notes: "" });
       toast("Progress entry saved.");
     },
     onError: () => toast("Could not save progress.", "error"),
@@ -703,13 +734,22 @@ function ProgressModal({ open, onClose, clientId, onSaved }: { open: boolean; on
             placeholder="Morning, fasted measurement…"
           />
         </Field>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" loading={mutation.isPending}>
-            Save entry
-          </Button>
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            {draftRestored && (
+              <Button type="button" variant="ghost" size="sm" onClick={clearFormDraft}>
+                Discard draft
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" loading={mutation.isPending}>
+              Save entry
+            </Button>
+          </div>
         </div>
       </form>
     </Modal>

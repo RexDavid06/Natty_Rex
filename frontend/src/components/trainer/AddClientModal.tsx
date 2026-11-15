@@ -5,6 +5,7 @@ import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import type { Client, Invitation } from "../../lib/types";
 import { Avatar, Button, Field, Input, Modal, Select, Textarea } from "../ui";
+import { useDraftState } from "../../lib/persistence/usePersistentState";
 
 interface Props {
   open: boolean;
@@ -65,7 +66,11 @@ export function InviteLink({ invitation }: { invitation: Invitation }) {
 }
 
 export function AddClientModal({ open, onClose, onCreated }: Props) {
-  const [form, setForm] = useState(emptyForm);
+  const {
+    value: form,
+    setValue: setForm,
+    clear: clearFormDraft,
+  } = useDraftState("trainer.add-client", emptyForm);
   const [created, setCreated] = useState<Client | null>(null);
   const { toast } = useToast();
 
@@ -79,16 +84,15 @@ export function AddClientModal({ open, onClose, onCreated }: Props) {
       }),
     onSuccess: (client) => {
       setCreated(client);
+      clearFormDraft();
       toast("Client added and invitation created.");
       onCreated?.(client);
-      setForm(emptyForm);
     },
     onError: (error) => toast(error instanceof ApiError ? error.message : "Could not add client.", "error"),
   });
 
   const close = () => {
     setCreated(null);
-    setForm(emptyForm);
     onClose();
   };
 

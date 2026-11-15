@@ -170,13 +170,20 @@ export function TrainerLayout() {
               transition={{ type: "spring", stiffness: 350, damping: 32 }}
               className="relative h-full w-72 border-r border-white/10 bg-ink-900"
             >
+              {sidebar}
               <button
+                type="button"
+                aria-label="Close menu"
+                onPointerDown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setMobileOpen(false);
+                }}
                 onClick={() => setMobileOpen(false)}
-                className="absolute right-3 top-4 z-10 rounded-lg p-2 text-white/40"
+                className="absolute right-3 top-4 z-50 rounded-lg bg-ink-900/90 p-2 text-white/50 transition hover:bg-white/[0.08] hover:text-white"
               >
                 <X className="h-4 w-4" />
               </button>
-              {sidebar}
             </motion.aside>
           </div>
         )}

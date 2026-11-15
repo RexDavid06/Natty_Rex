@@ -7,6 +7,7 @@ import type { Paginated, Program, ProgramDetail } from "../../lib/types";
 import { PageHeader } from "../../components/layout/AppLayout";
 import { Badge, Button, Card, EmptyState, Field, Input, Modal, Select, Skeleton, Textarea } from "../../components/ui";
 import { useToast } from "../../lib/toast";
+import { useDraftState, usePersistentState } from "../../lib/persistence/usePersistentState";
 import { formatDate, todayISO } from "../../lib/utils";
 
 const objectives = [
@@ -29,9 +30,12 @@ export function ProgramsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [createOpen, setCreateOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const [filters, setFilters] = usePersistentState("trainer.programs.filters", {
+    search: "",
+    status: "",
+  });
+  const { search, status } = filters;
   const deferredSearch = useDeferredValue(search);
-  const [status, setStatus] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["programs", deferredSearch, status],
@@ -44,7 +48,12 @@ export function ProgramsPage() {
   });
 
   const programs = data?.results ?? [];
-  const [form, setForm] = useState({
+  const {
+    value: form,
+    setValue: setForm,
+    restored: draftRestored,
+    clear: clearFormDraft,
+  } = useDraftState("trainer.program.create", {
     name: "",
     objective: "HYPERTROPHY",
     description: "",
@@ -56,6 +65,8 @@ export function ProgramsPage() {
   const createMutation = useMutation({
     mutationFn: () => api.post<ProgramDetail>("/programs/", form),
     onSuccess: (program) => {
+      clearFormDraft();
+      setCreateOpen(false);
       toast("Program created. Start building your weeks.");
       navigate(`/trainer/programs/${program.id}`);
     },
@@ -78,9 +89,18 @@ export function ProgramsPage() {
       <div className="mb-4 flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-white/25" />
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search programs" className="pl-10" />
+          <Input
+            value={search}
+            onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))}
+            placeholder="Search programs"
+            className="pl-10"
+          />
         </div>
-        <Select value={status} onChange={(event) => setStatus(event.target.value)} className="sm:w-44">
+        <Select
+          value={status}
+          onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
+          className="sm:w-44"
+        >
           <option value="">All statuses</option>
           <option value="DRAFT">Draft</option>
           <option value="ACTIVE">Active</option>
@@ -197,13 +217,22 @@ export function ProgramsPage() {
               placeholder="Upper/lower split with progressive overload, 4 training days per week…"
             />
           </Field>
-          <div className="flex justify-end gap-2 border-t border-white/[0.06] pt-4">
-            <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" loading={createMutation.isPending}>
-              Create & build
-            </Button>
+          <div className="flex items-center justify-between gap-2 border-t border-white/[0.06] pt-4">
+            <div>
+              {draftRestored && (
+                <Button type="button" variant="ghost" size="sm" onClick={clearFormDraft}>
+                  Discard draft
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={createMutation.isPending}>
+                Create & build
+              </Button>
+            </div>
           </div>
         </form>
       </Modal>

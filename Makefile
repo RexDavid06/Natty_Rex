@@ -3,7 +3,7 @@ PYTHON ?= python
 BACKEND := backend
 FRONTEND := frontend
 
-.PHONY: help env install backend-install frontend-install migrate trainer backend frontend dev \
+.PHONY: help env install backend-install frontend-install migrate trainer seed backend frontend dev \
 	test backend-test frontend-test lint check build docker-build docker-up docker-down docker-logs
 
 help:
@@ -13,6 +13,7 @@ help:
 		'  make install           Install backend and frontend dependencies' \
 		'  make migrate           Apply database migrations' \
 		'  make trainer           Provision the private trainer account' \
+		'  make seed              Add the built-in exercise library' \
 		'  make dev               Run Django and Vite together' \
 		'  make backend           Run the Django API on :8000' \
 		'  make frontend          Run the Vite app on :5173' \
@@ -37,6 +38,9 @@ migrate:
 
 trainer:
 	cd $(BACKEND) && $(PYTHON) manage.py create_trainer
+
+seed:
+	cd $(BACKEND) && $(PYTHON) manage.py seed_exercises
 
 backend:
 	cd $(BACKEND) && $(PYTHON) manage.py runserver 0.0.0.0:8000

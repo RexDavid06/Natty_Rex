@@ -1,4 +1,5 @@
 import { useDeferredValue, useState } from "react";
+import { usePersistentState } from "../../lib/persistence/usePersistentState";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, MailCheck, Search, UserPlus, Users } from "lucide-react";
@@ -11,10 +12,13 @@ import { formatDate, pluralize } from "../../lib/utils";
 
 export function ClientsPage() {
   const [addOpen, setAddOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const [filters, setFilters] = usePersistentState("trainer.clients.filters", {
+    search: "",
+    status: "active",
+    page: 1,
+  });
+  const { search, status, page } = filters;
   const deferredSearch = useDeferredValue(search);
-  const [status, setStatus] = useState("active");
-  const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
     queryKey: ["clients", page, deferredSearch, status],
@@ -47,20 +51,18 @@ export function ClientsPage() {
           <Search className="pointer-events-none absolute left-3.5 top-3.5 h-4 w-4 text-white/25" />
           <Input
             value={search}
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setPage(1);
-            }}
+            onChange={(event) =>
+              setFilters((current) => ({ ...current, search: event.target.value, page: 1 }))
+            }
             placeholder="Search by name, email or phone"
             className="pl-10"
           />
         </div>
         <Select
           value={status}
-          onChange={(event) => {
-            setStatus(event.target.value);
-            setPage(1);
-          }}
+          onChange={(event) =>
+            setFilters((current) => ({ ...current, status: event.target.value, page: 1 }))
+          }
           className="sm:w-44"
         >
           <option value="active">Active clients</option>
@@ -145,10 +147,10 @@ export function ClientsPage() {
                 {data.count} clients · page {page} of {totalPages}
               </p>
               <div className="flex gap-2">
-                <Button variant="secondary" size="sm" disabled={!data.previous} onClick={() => setPage((p) => p - 1)}>
+                <Button variant="secondary" size="sm" disabled={!data.previous} onClick={() => setFilters((current) => ({ ...current, page: Math.max(1, current.page - 1) }))}>
                   <ChevronLeft className="h-3.5 w-3.5" /> Previous
                 </Button>
-                <Button variant="secondary" size="sm" disabled={!data.next} onClick={() => setPage((p) => p + 1)}>
+                <Button variant="secondary" size="sm" disabled={!data.next} onClick={() => setFilters((current) => ({ ...current, page: current.page + 1 }))}>
                   Next <ChevronRight className="h-3.5 w-3.5" />
                 </Button>
               </div>

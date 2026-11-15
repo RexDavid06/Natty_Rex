@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./lib/auth";
+import { readLastRoute, roleHome } from "./lib/persistence/storage";
 import { ProtectedRoute, PublicOnlyRoute } from "./components/layout/Guards";
 import { ClientLayout, TrainerLayout } from "./components/layout/AppLayout";
 import { Spinner } from "./components/ui";
@@ -39,7 +40,7 @@ function RootRedirect() {
     );
   }
   if (!user) return <Navigate to="/login" replace />;
-  return <Navigate to={user.role === "TRAINER" ? "/trainer/dashboard" : "/app"} replace />;
+  return <Navigate to={readLastRoute(user.id, user.role) ?? roleHome(user.role)} replace />;
 }
 
 export default function App() {

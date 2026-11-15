@@ -155,7 +155,7 @@ git pull
 make docker-up
 ```
 
-Migrations and static collection run automatically at container start. Back up first, and review migrations for destructive changes before deploying.
+Migrations and static collection run automatically at container start. The exercise library migration seeds existing trainer accounts idempotently. Back up first, and review migrations for destructive changes before deploying. To add the library manually, run `python manage.py seed_exercises` (optionally with `--trainer-email`).
 
 ## 9. Smoke checks after deployment
 
@@ -177,7 +177,7 @@ Migrations and static collection run automatically at container start. Back up f
 | Redirect loop behind TLS proxy | `X-Forwarded-Proto` preserved; `SECURE_SSL_REDIRECT=True` |
 | Uploads 413 | `MAX_UPLOAD_MB` and nginx `client_max_body_size` |
 | Media 404 | media volume mounted in backend and nginx; files exist under `/app/media` |
-| PWA serves old JS | `/sw.js` must be served no-cache; latest deploy reloads on next visit |
+| PWA serves old JS | `/sw.js` must be served no-cache; a new deploy shows the in-app update prompt |
 | PostgreSQL won't initialise on Termux | Local SQLite is expected there; use PostgreSQL on a normal server |
 
 ## Local Termux notes

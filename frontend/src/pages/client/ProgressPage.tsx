@@ -25,6 +25,7 @@ import {
   Textarea,
 } from "../../components/ui";
 import { formatDate } from "../../lib/utils";
+import { useDraftState } from "../../lib/persistence/usePersistentState";
 
 const MEASUREMENTS = [
   ["chest", "Chest"], ["waist", "Waist"], ["hips", "Hips"],
@@ -246,7 +247,12 @@ function AddProgressModal({ open, onClose, onSaved, existingDates }: {
 }) {
   const { toast } = useToast();
   const today = new Date().toISOString().slice(0, 10);
-  const [form, setForm] = useState({
+  const {
+    value: form,
+    setValue: setForm,
+    restored: draftRestored,
+    clear: clearFormDraft,
+  } = useDraftState("client.progress.add", {
     date: today, weight_kg: "", body_fat_percentage: "", notes: "",
     chest: "", waist: "", hips: "", left_arm: "", right_arm: "", thighs: "",
   });
@@ -266,9 +272,9 @@ function AddProgressModal({ open, onClose, onSaved, existingDates }: {
       });
     },
     onSuccess: () => {
+      clearFormDraft();
       onSaved();
       onClose();
-      setForm({ date: today, weight_kg: "", body_fat_percentage: "", notes: "", chest: "", waist: "", hips: "", left_arm: "", right_arm: "", thighs: "" });
     },
     onError: (error) => toast(error instanceof ApiError ? error.message : "Could not save check-in.", "error"),
   });
@@ -297,9 +303,16 @@ function AddProgressModal({ open, onClose, onSaved, existingDates }: {
           </div>
         </div>
         <Field label="Notes"><Textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder="Sleep, stress, nutrition, how clothes fit…" /></Field>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button type="submit" loading={save.isPending}>Save check-in</Button>
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            {draftRestored && (
+              <Button type="button" variant="ghost" size="sm" onClick={clearFormDraft}>Discard draft</Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
+            <Button type="submit" loading={save.isPending}>Save check-in</Button>
+          </div>
         </div>
       </form>
     </Modal>

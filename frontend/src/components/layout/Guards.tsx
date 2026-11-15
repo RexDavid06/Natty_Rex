@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 import { useAuth } from "../../lib/auth";
+import { readLastRoute, roleHome } from "../../lib/persistence/storage";
 import { Spinner } from "../ui";
 
 export function ProtectedRoute({ role, children }: { role?: "TRAINER" | "CLIENT"; children?: ReactNode }) {
@@ -14,9 +15,17 @@ export function ProtectedRoute({ role, children }: { role?: "TRAINER" | "CLIENT"
       </div>
     );
   }
-  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  if (!user) {
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: `${location.pathname}${location.search}${location.hash}` }}
+      />
+    );
+  }
   if (role && user.role !== role) {
-    return <Navigate to={user.role === "TRAINER" ? "/trainer/dashboard" : "/app"} replace />;
+    return <Navigate to={readLastRoute(user.id, user.role) ?? roleHome(user.role)} replace />;
   }
   return <>{children ?? <Outlet />}</>;
 }
@@ -30,6 +39,6 @@ export function PublicOnlyRoute({ children }: { children: ReactNode }) {
       </div>
     );
   }
-  if (user) return <Navigate to={user.role === "TRAINER" ? "/trainer/dashboard" : "/app"} replace />;
+  if (user) return <Navigate to={readLastRoute(user.id, user.role) ?? roleHome(user.role)} replace />;
   return <>{children}</>;
 }

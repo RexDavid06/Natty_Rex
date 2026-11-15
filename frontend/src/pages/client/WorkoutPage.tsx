@@ -32,6 +32,7 @@ import {
   Textarea,
 } from "../../components/ui";
 import { formatDate, formatDateTime } from "../../lib/utils";
+import { useDraftState, usePersistentState } from "../../lib/persistence/usePersistentState";
 
 export function WorkoutPage() {
   const { id = "" } = useParams();
@@ -40,8 +41,12 @@ export function WorkoutPage() {
   const { toast } = useToast();
   const [completing, setCompleting] = useState<ClientWorkoutExercise | null>(null);
   const [finishOpen, setFinishOpen] = useState(false);
-  const [workoutNotes, setWorkoutNotes] = useState("");
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expanded, setExpanded] = usePersistentState<string | null>(`client.workout.${id}.expanded`, null);
+  const {
+    value: workoutNotes,
+    setValue: setWorkoutNotes,
+    clear: clearWorkoutDraft,
+  } = useDraftState(`client.workout.${id}.finish`, "");
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["client-session", id],
@@ -65,9 +70,9 @@ export function WorkoutPage() {
   const finish = useMutation({
     mutationFn: () => api.post(`/client/sessions/${id}/complete/`, { notes: workoutNotes }),
     onSuccess: () => {
+      clearWorkoutDraft();
       refresh();
       setFinishOpen(false);
-      setWorkoutNotes("");
       toast("Workout complete. Great work.");
       navigate("/app");
     },
@@ -292,19 +297,29 @@ export function WorkoutPage() {
 
 function ExerciseCompleteModal({ exercise, onClose, onDone }: { exercise: ClientWorkoutExercise; onClose: () => void; onDone: () => void }) {
   const { toast } = useToast();
-  const [sets, setSets] = useState(String(exercise.sets));
-  const [reps, setReps] = useState(exercise.reps);
-  const [weight, setWeight] = useState(exercise.weight ?? "");
-  const [notes, setNotes] = useState("");
+  const {
+    value: form,
+    setValue: setForm,
+    clear: clearFormDraft,
+  } = useDraftState(`client.exercise.${exercise.id}.complete`, {
+    sets: String(exercise.sets),
+    reps: exercise.reps,
+    weight: exercise.weight ?? "",
+    notes: "",
+  });
 
   const complete = useMutation({
     mutationFn: () => api.post(`/client/exercises/${exercise.id}/complete/`, {
-      actual_sets: Number(sets) || exercise.sets,
-      actual_reps: reps,
-      actual_weight: weight || null,
-      notes,
+      actual_sets: Number(form.sets) || exercise.sets,
+      actual_reps: form.reps,
+      actual_weight: form.weight || null,
+      notes: form.notes,
     }),
-    onSuccess: () => { toast(`${exercise.exercise_name} logged.`); onDone(); },
+    onSuccess: () => {
+      clearFormDraft();
+      toast(`${exercise.exercise_name} logged.`);
+      onDone();
+    },
     onError: (error) => toast(error instanceof ApiError ? error.message : "Could not log exercise.", "error"),
   });
 
@@ -312,11 +327,11 @@ function ExerciseCompleteModal({ exercise, onClose, onDone }: { exercise: Client
     <Modal open onClose={onClose} title={exercise.exercise_name} description={`Prescribed: ${exercise.sets} × ${exercise.reps}${exercise.weight ? ` @ ${exercise.weight}kg` : ""}`}>
       <form onSubmit={(event) => { event.preventDefault(); complete.mutate(); }} className="space-y-4">
         <div className="grid grid-cols-3 gap-3">
-          <Field label="Sets done"><Input type="number" min={0} value={sets} onChange={(event) => setSets(event.target.value)} required /></Field>
-          <Field label="Reps"><Input value={reps} onChange={(event) => setReps(event.target.value)} required /></Field>
-          <Field label="Weight (kg)"><Input type="number" step="0.5" value={weight} onChange={(event) => setWeight(event.target.value)} placeholder="—" /></Field>
+          <Field label="Sets done"><Input type="number" min={0} value={form.sets} onChange={(event) => setForm({ ...form, sets: event.target.value })} required /></Field>
+          <Field label="Reps"><Input value={form.reps} onChange={(event) => setForm({ ...form, reps: event.target.value })} required /></Field>
+          <Field label="Weight (kg)"><Input type="number" step="0.5" value={form.weight} onChange={(event) => setForm({ ...form, weight: event.target.value })} placeholder="—" /></Field>
         </div>
-        <Field label="Notes (optional)"><Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="How did it feel? Any form breakdown?" className="min-h-[72px]" /></Field>
+        <Field label="Notes (optional)"><Textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder="How did it feel? Any form breakdown?" className="min-h-[72px]" /></Field>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
           <Button type="submit" loading={complete.isPending}><Check className="h-4 w-4" /> Log exercise</Button>

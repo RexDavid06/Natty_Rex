@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -14,11 +14,14 @@ import { api } from "../../lib/api";
 import type { CalendarResponse, ClientAssignment } from "../../lib/types";
 import { Badge, Button, Card, EmptyState, Skeleton } from "../../components/ui";
 import { formatDate } from "../../lib/utils";
+import { usePersistentState } from "../../lib/persistence/usePersistentState";
 
 export function ClientCalendarPage() {
-  const [assignmentId, setAssignmentId] = useState("");
-  const [week, setWeek] = useState(1);
-  const [bootstrapped, setBootstrapped] = useState(false);
+  const [view, setView] = usePersistentState<{ assignmentId: string; week: number }>(
+    "client.calendar.view",
+    { assignmentId: "", week: 1 },
+  );
+  const { assignmentId, week } = view;
 
   const { data: assignments = [], isLoading: loadingAssignments } = useQuery({
     queryKey: ["client-assignments"],
@@ -26,21 +29,27 @@ export function ClientCalendarPage() {
   });
 
   useEffect(() => {
-    if (bootstrapped || assignments.length === 0) return;
+    if (assignments.length === 0) return;
+    const selected = assignments.find((assignment) => assignment.id === assignmentId);
+    if (selected) {
+      if (week > selected.program.weeks_duration) {
+        setView((current) => ({ ...current, week: selected.program.weeks_duration }));
+      }
+      return;
+    }
     const latest = assignments[0];
-    setAssignmentId(latest.id);
     const rawStart = new Date(latest.start_date ?? latest.assigned_at);
     const start = new Date(rawStart);
     start.setDate(rawStart.getDate() - ((rawStart.getDay() + 6) % 7));
     const elapsed = Math.floor((Date.now() - start.getTime()) / 86_400_000);
-    setWeek(Math.max(1, Math.min(Math.floor(elapsed / 7) + 1, latest.program.weeks_duration)));
-    setBootstrapped(true);
-  }, [assignments, bootstrapped]);
+    const currentWeek = Math.max(1, Math.min(Math.floor(elapsed / 7) + 1, latest.program.weeks_duration));
+    setView({ assignmentId: latest.id, week: currentWeek });
+  }, [assignmentId, assignments, setView, week]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["client-calendar", assignmentId, week],
     queryFn: () => api.get<CalendarResponse>(`/client/calendar/?week=${week}${assignmentId ? `&assignment=${assignmentId}` : ""}`),
-    enabled: bootstrapped,
+    enabled: Boolean(assignmentId) && !loadingAssignments,
   });
 
   const currentWeek = data?.week_number ?? week;
@@ -80,7 +89,7 @@ export function ClientCalendarPage() {
         {assignments.length > 1 && (
           <select
             value={assignmentId}
-            onChange={(event) => { setAssignmentId(event.target.value); setWeek(1); }}
+            onChange={(event) => setView({ assignmentId: event.target.value, week: 1 })}
             className="rounded-xl border border-white/[0.08] bg-ink-850 px-3 py-2 text-xs text-white/70 outline-none focus:border-lime-400/40"
           >
             {assignments.map((assignment) => (
@@ -91,14 +100,14 @@ export function ClientCalendarPage() {
       </div>
 
       <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/[0.07] bg-white/[0.02] p-2">
-        <Button size="sm" variant="ghost" onClick={() => setWeek(Math.max(1, currentWeek - 1))} disabled={currentWeek <= 1}>
+        <Button size="sm" variant="ghost" onClick={() => setView((current) => ({ ...current, week: Math.max(1, currentWeek - 1) }))} disabled={currentWeek <= 1}>
           <ChevronLeft className="h-4 w-4" /> Prev
         </Button>
         <div className="text-center">
           <p className="text-xs font-semibold">Week {currentWeek} <span className="text-white/25">/ {duration}</span></p>
           <p className="text-[10px] text-white/30">{data?.assignment?.program.name}</p>
         </div>
-        <Button size="sm" variant="ghost" onClick={() => setWeek(Math.min(duration, currentWeek + 1))} disabled={currentWeek >= duration}>
+        <Button size="sm" variant="ghost" onClick={() => setView((current) => ({ ...current, week: Math.min(duration, currentWeek + 1) }))} disabled={currentWeek >= duration}>
           Next <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
