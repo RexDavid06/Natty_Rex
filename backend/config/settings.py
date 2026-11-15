@@ -226,12 +226,21 @@ SPECTACULAR_SETTINGS = {
     },
 }
 
+FRONTEND_URL = env("FRONTEND_URL").rstrip("/")
+
 CORS_ALLOWED_ORIGINS = env("CORS_ALLOWED_ORIGINS")
+if FRONTEND_URL.startswith(("http://", "https://")) and FRONTEND_URL not in CORS_ALLOWED_ORIGINS:
+    CORS_ALLOWED_ORIGINS.append(FRONTEND_URL)
+# The SPA is deployed separately (Vercel), so allow its production and preview
+# origins in addition to any explicitly configured origins.
+CORS_ALLOWED_ORIGIN_REGEXES = [r"^https://[\w-]+\.vercel\.app$"]
 CORS_ALLOW_CREDENTIALS = False
+
 CSRF_TRUSTED_ORIGINS = env("CSRF_TRUSTED_ORIGINS")
+if FRONTEND_URL.startswith(("http://", "https://")) and FRONTEND_URL not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(FRONTEND_URL)
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-FRONTEND_URL = env("FRONTEND_URL").rstrip("/")
 INVITATION_TTL_DAYS = env("INVITATION_TTL_DAYS")
 MAX_UPLOAD_MB = env("MAX_UPLOAD_MB")
 

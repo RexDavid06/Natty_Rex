@@ -204,6 +204,29 @@ class SelfProfileUpdateTests(APITestCase):
                 self.assertFalse(self.client_profile.avatar)
 
 
+class CorsTests(APITestCase):
+    def test_vercel_frontend_origin_is_allowed(self):
+        response = self.client.options(
+            reverse("login"),
+            HTTP_ORIGIN="https://natty-rex.vercel.app",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS="content-type",
+        )
+        self.assertEqual(
+            response["Access-Control-Allow-Origin"], "https://natty-rex.vercel.app"
+        )
+        self.assertIn("POST", response["Access-Control-Allow-Methods"])
+
+    def test_unknown_origin_is_not_allowed(self):
+        response = self.client.options(
+            reverse("login"),
+            HTTP_ORIGIN="https://example.com",
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD="POST",
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS="content-type",
+        )
+        self.assertNotIn("Access-Control-Allow-Origin", response)
+
+
 class InvitationFlowTests(APITestCase):
     def setUp(self):
         self.trainer = make_trainer()
