@@ -1,4 +1,10 @@
-const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? "http://localhost:8000/api/v1";
+const API_URL =
+  (import.meta.env.VITE_API_URL as string | undefined) ??
+  (import.meta.env.PROD
+    ? (import.meta.env.VITE_API_URL as string | undefined) ?? ""
+    : "http://localhost:8000/api/v1");
+
+const API_BASE = API_URL || "http://localhost:8000/api/v1";
 
 const ACCESS_KEY = "nattyrex.access";
 const REFRESH_KEY = "nattyrex.refresh";
@@ -54,7 +60,7 @@ async function refreshSession(): Promise<boolean> {
   const refresh = tokenStore.refresh();
   if (!refresh) return false;
   if (!refreshPromise) {
-    refreshPromise = fetch(`${API_URL}/auth/refresh/`, {
+    refreshPromise = fetch(`${API_BASE}/auth/refresh/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ refresh }),
@@ -83,7 +89,11 @@ interface RequestOptions extends Omit<RequestInit, "body"> {
   raw?: boolean;
 }
 
-export async function apiFetch<T>(path: string, options: RequestOptions = {}, retried = false): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  options: RequestOptions = {},
+  retried = false,
+): Promise<T> {
   const { body, anonymous, raw, headers, ...rest } = options;
   const isForm = body instanceof FormData;
   const finalHeaders = new Headers(headers);
@@ -93,7 +103,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}, re
     if (access) finalHeaders.set("Authorization", `Bearer ${access}`);
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(`${API_BASE}${path}`, {
     ...rest,
     headers: finalHeaders,
     body: isForm ? body : body !== undefined ? JSON.stringify(body) : undefined,
@@ -134,4 +144,4 @@ export const api = {
     apiFetch<T>(path, { method: "POST", body, anonymous: true }),
 };
 
-export { API_URL };
+export { API_BASE };

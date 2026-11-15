@@ -10,16 +10,16 @@ import {
   LibraryBig,
   LogOut,
   Menu,
-  Smartphone,
   TrendingUp,
   Users,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "../../lib/auth";
-import { cn, isStandalone } from "../../lib/utils";
+import { cn } from "../../lib/utils";
 import { Logo } from "./Logo";
 import { Notifications } from "./Notifications";
+import { InstallAppButton } from "../InstallApp";
 import { Avatar, Button } from "../ui";
 
 const trainerNav = [
@@ -36,31 +36,6 @@ const clientNav = [
   { to: "/app/progress", label: "Progress", icon: TrendingUp },
 ];
 
-interface InstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
-
-function useInstallPrompt() {
-  const [event, setEvent] = useState<InstallPromptEvent | null>(null);
-  useEffect(() => {
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setEvent(e as InstallPromptEvent);
-    };
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
-  return {
-    available: Boolean(event) && !isStandalone(),
-    install: async () => {
-      if (!event) return;
-      await event.prompt();
-      setEvent(null);
-    },
-  };
-}
-
 function useOnline() {
   const [online, setOnline] = useState(navigator.onLine);
   useEffect(() => {
@@ -74,24 +49,6 @@ function useOnline() {
     };
   }, []);
   return online;
-}
-
-function InstallButton({ compact }: { compact?: boolean }) {
-  const { available, install } = useInstallPrompt();
-  if (!available) return null;
-  return (
-    <button
-      onClick={install}
-      className={cn(
-        "flex items-center gap-2 rounded-xl border border-lime-400/20 bg-lime-400/[0.06] text-xs font-medium text-lime-300 transition hover:bg-lime-400/10",
-        compact ? "h-9 w-9 justify-center" : "px-3 py-2",
-      )}
-      title="Install Nattyrex"
-    >
-      <Smartphone className="h-4 w-4" />
-      {!compact && "Install app"}
-    </button>
-  );
 }
 
 export function OfflineBanner() {
@@ -141,7 +98,7 @@ export function TrainerLayout() {
         ))}
       </nav>
       <div className="space-y-2 border-t border-white/[0.06] p-3">
-        <InstallButton />
+        <InstallAppButton />
         <div className="flex items-center gap-2 rounded-xl p-2">
           <Avatar name={user?.full_name} src={user?.avatar} size="sm" />
           <div className="min-w-0 flex-1">
@@ -182,7 +139,7 @@ export function TrainerLayout() {
           Private trainer workspace
         </div>
         <div className="flex items-center gap-2">
-          <InstallButton compact />
+          <InstallAppButton compact />
           <Notifications />
           <div className="hidden lg:block">
             <Avatar name={user?.full_name} src={user?.avatar} size="sm" />
@@ -238,7 +195,7 @@ export function ClientLayout() {
         <div className="mx-auto flex h-16 w-full max-w-4xl items-center justify-between px-4 sm:px-6">
           <Logo to="/app" />
           <div className="flex items-center gap-2">
-            <InstallButton compact />
+            <InstallAppButton compact />
             <Notifications />
             <button
               onClick={signOut}
@@ -299,6 +256,9 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           <Logo />
         </div>
         {children}
+        <div className="mt-4 flex justify-center">
+          <InstallAppButton />
+        </div>
       </div>
     </div>
   );
