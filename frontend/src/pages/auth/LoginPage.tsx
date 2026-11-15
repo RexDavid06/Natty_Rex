@@ -1,10 +1,15 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, Download } from "lucide-react";
 import { useAuth } from "../../lib/auth";
 import { ApiError } from "../../lib/api";
 import { Button, Field, Input } from "../../components/ui";
 import { AuthLayout } from "../../components/layout/AppLayout";
+
+const STORE_LINKS = {
+  ios: "https://apps.apple.com/app/idAPPLE_APP_ID",
+  android: "https://play.google.com/store/apps/details?id=com.nattyrex.app",
+};
 
 export function LoginPage() {
   const { login, user } = useAuth();
@@ -90,6 +95,28 @@ export function LoginPage() {
             Sign in <ArrowRight className="h-4 w-4" />
           </Button>
         </form>
+        <div className="mt-6 grid gap-3">
+          <a
+            className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.07] hover:text-white"
+            href={STORE_LINKS.ios}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Download Nattyrex on the App Store"
+          >
+            <Download className="h-4 w-4" />
+            Download for iOS
+          </a>
+          <a
+            className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-medium text-white transition hover:bg-white/[0.07] hover:text-white"
+            href={STORE_LINKS.android}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Download Nattyrex on Google Play"
+          >
+            <Download className="h-4 w-4" />
+            Download for Android
+          </a>
+        </div>
         <p className="mt-6 border-t border-white/[0.06] pt-4 text-center text-[11px] leading-relaxed text-white/30">
           Accounts are created by invitation only. Ask your trainer for a secure invite link.
         </p>
