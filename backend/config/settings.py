@@ -92,8 +92,27 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 if database_url := env("DATABASE_URL"):
+    # Neon's serverless Postgres only accepts TCP connections. Django's
+    # database adapter treats a `host` that starts with `/` as a Unix-socket
+    # path, so the connection string must point at the Neon host, not at a
+    # `.s.PGSQL.5432` socket. `sslmode=require` is the minimum Neon-safe TLS
+    # setting; use `verify-full` with a pinned CA for stricter verification.
+    # Neon (TCP, not Unix sockets): use the pooled URL for the app and the
+    # unpooled URL for migrations. The unpooled URL keeps migrations off the
+    # PgBouncer pool and lets them run with plain transactions.
+    if "-pooler" in database_url:
+        # Use the psycopg driver explicitly. Django's sqlite3 backend is the
+        # only one that needs the raw URL here; even then, it keeps the plain
+        # postgres:// scheme so DATABASE_URL stays a normal PostgreSQL URL
+        # (the adapter string is only needed for the pooled path).
+        if "postgresql://" in database_url:
+            database_url = database_url.replace(
+                "postgresql://", "postgresql+psycopg://", 1
+            )
+
     DATABASES = {"default": env.db("DATABASE_URL")}
     DATABASES["default"]["CONN_MAX_AGE"] = 60
+
     if "-pooler" in database_url:
         # PgBouncer transaction pooling (Neon pooled connections) cannot keep
         # server-side cursors open between transactions.

@@ -65,14 +65,14 @@ Render looks for a `Dockerfile` at the repository root by default, so the root `
 DEBUG=False
 SECRET_KEY=<64+ random characters>
 ALLOWED_HOSTS=nattyrex-backend.onrender.com
-DATABASE_URL=postgres://...
-DATABASE_URL_UNPOOLED=postgres://...
+DATABASE_URL=postgresql://...@ep-...-pooler.region.aws.neon.tech/db?sslmode=require
+DATABASE_URL_UNPOOLED=postgresql://...@ep-...region.aws.neon.tech/db?sslmode=require
 FRONTEND_URL=https://<your-frontend-host>
 CORS_ALLOWED_ORIGINS=https://<your-frontend-host>
 CSRF_TRUSTED_ORIGINS=https://<your-frontend-host>
 ```
 
-On Neon, use the pooled connection string (host contains `-pooler`) for `DATABASE_URL` and the direct one for `DATABASE_URL_UNPOOLED`. The entrypoint automatically runs migrations over the direct connection and serves requests over the pooled one. If `DATABASE_URL_UNPOOLED` is unset, migrations fall back to `DATABASE_URL`.
+On Neon, use the pooled connection string (host contains `-pooler`) for `DATABASE_URL` and the direct one for `DATABASE_URL_UNPOOLED`. Both are TCP URLs; Neon only accepts TCP connections, not Unix sockets. `DATABASE_URL_UNPOOLED` is optional — if unset, migrations fall back to `DATABASE_URL`. The entrypoint automatically runs migrations over the direct connection and serves requests over the pooled one.
 
 `SECURE_SSL_REDIRECT` defaults to `True` when `DEBUG=False`, which is correct behind Render's HTTPS proxy. Attach a persistent disk mounted at `/app/media` if uploaded videos must survive deploys.
 
