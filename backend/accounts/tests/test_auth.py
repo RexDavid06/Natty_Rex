@@ -1,5 +1,8 @@
 from datetime import timedelta
+import tempfile
 
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
@@ -110,6 +113,95 @@ class AuthenticationTests(APITestCase):
             reverse("token-refresh"), {"refresh": rotated.data["refresh"]}, format="json"
         )
         self.assertEqual(reuse.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class SelfProfileUpdateTests(APITestCase):
+    def setUp(self):
+        self.trainer = make_trainer()
+        self.client_profile = make_client(
+            self.trainer,
+            email="self@example.com",
+            full_name="Self Client",
+            fitness_goals="General fitness",
+        )
+
+    def test_client_can_update_own_profile(self):
+        self.client.force_authenticate(self.client_profile.user)
+        response = self.client.patch(
+            reverse("me"),
+            {
+                "full_name": "Renamed Client",
+                "email": "renamed-self@example.com",
+                "phone": "+15551234567",
+                "gender": "FEMALE",
+                "date_of_birth": "1995-04-12",
+                "fitness_goals": "Run a marathon",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["full_name"], "Renamed Client")
+        self.assertEqual(response.data["email"], "renamed-self@example.com")
+        self.assertEqual(response.data["gender"], "FEMALE")
+        self.assertEqual(response.data["date_of_birth"], "1995-04-12")
+        self.assertEqual(response.data["fitness_goals"], "Run a marathon")
+
+        self.client_profile.refresh_from_db()
+        self.client_profile.user.refresh_from_db()
+        self.assertEqual(self.client_profile.user.email, "renamed-self@example.com")
+        self.assertEqual(self.client_profile.user.phone, "+15551234567")
+        self.assertEqual(self.client_profile.gender, "FEMALE")
+        self.assertEqual(self.client_profile.fitness_goals, "Run a marathon")
+
+    def test_trainer_can_update_name_and_bio(self):
+        self.client.force_authenticate(self.trainer)
+        response = self.client.patch(
+            reverse("me"),
+            {"full_name": "Coach Renamed", "bio": "Strength coach"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["full_name"], "Coach Renamed")
+        self.assertEqual(response.data["bio"], "Strength coach")
+
+        self.trainer.refresh_from_db()
+        self.trainer.trainer_profile.refresh_from_db()
+        self.assertEqual(self.trainer.full_name, "Coach Renamed")
+        self.assertEqual(self.trainer.trainer_profile.bio, "Strength coach")
+
+        no_email = self.client.patch(reverse("me"), {"email": ""}, format="json")
+        self.assertEqual(no_email.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_duplicate_email_is_rejected(self):
+        self.client.force_authenticate(self.client_profile.user)
+        response = self.client.patch(
+            reverse("me"), {"email": self.trainer.email}, format="json"
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_avatar_upload_and_removal(self):
+        self.client.force_authenticate(self.client_profile.user)
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                upload = SimpleUploadedFile(
+                    "avatar.png", b"fake-image-bytes", content_type="image/png"
+                )
+                response = self.client.patch(
+                    reverse("me"), {"avatar": upload}, format="multipart"
+                )
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertIsNotNone(response.data["avatar"])
+
+                self.client_profile.refresh_from_db()
+                self.assertTrue(self.client_profile.avatar)
+
+                removed = self.client.patch(
+                    reverse("me"), {"remove_avatar": True}, format="multipart"
+                )
+                self.assertEqual(removed.status_code, status.HTTP_200_OK)
+                self.assertIsNone(removed.data["avatar"])
+                self.client_profile.refresh_from_db()
+                self.assertFalse(self.client_profile.avatar)
 
 
 class InvitationFlowTests(APITestCase):

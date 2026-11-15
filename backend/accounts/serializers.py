@@ -1,21 +1,33 @@
+from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
+from django.db import transaction
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import ClientInvitation, ClientProfile, Notification, User
-from .services import PHONE_EMAIL_DOMAIN
+from .models import ClientInvitation, ClientProfile, Notification, TrainerProfile, User
+from .services import PHONE_EMAIL_DOMAIN, is_placeholder_email, placeholder_email
 
 
 class UserSerializer(serializers.ModelSerializer):
     display_name = serializers.CharField(source="full_name", read_only=True)
     avatar = serializers.SerializerMethodField()
+    bio = serializers.SerializerMethodField()
+    gender = serializers.SerializerMethodField()
+    date_of_birth = serializers.SerializerMethodField()
+    fitness_goals = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "email", "full_name", "display_name", "phone", "role", "avatar"]
-        read_only_fields = ["id", "role", "display_name", "avatar"]
+        fields = [
+            "id", "email", "full_name", "display_name", "phone", "role", "avatar",
+            "bio", "gender", "date_of_birth", "fitness_goals",
+        ]
+        read_only_fields = [
+            "id", "role", "display_name", "avatar", "bio", "gender",
+            "date_of_birth", "fitness_goals",
+        ]
 
     def get_avatar(self, obj):
         profile = getattr(obj, "client_profile", None) or getattr(
@@ -25,6 +37,22 @@ class UserSerializer(serializers.ModelSerializer):
             request = self.context.get("request")
             return request.build_absolute_uri(profile.avatar.url) if request else profile.avatar.url
         return None
+
+    def get_bio(self, obj) -> str:
+        profile = getattr(obj, "trainer_profile", None)
+        return profile.bio if profile else ""
+
+    def get_gender(self, obj) -> str:
+        profile = getattr(obj, "client_profile", None)
+        return profile.gender if profile else ""
+
+    def get_date_of_birth(self, obj) -> str | None:
+        profile = getattr(obj, "client_profile", None)
+        return profile.date_of_birth.isoformat() if profile and profile.date_of_birth else None
+
+    def get_fitness_goals(self, obj) -> str:
+        profile = getattr(obj, "client_profile", None)
+        return profile.fitness_goals if profile else ""
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -104,6 +132,94 @@ class PasswordChangeSerializer(serializers.Serializer):
         user = self.context["request"].user
         user.set_password(self.validated_data["new_password"])
         user.save(update_fields=["password"])
+        return user
+
+
+class ProfileUpdateSerializer(serializers.Serializer):
+    full_name = serializers.CharField(max_length=150, required=False)
+    email = serializers.EmailField(required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=32, required=False, allow_blank=True)
+    bio = serializers.CharField(required=False, allow_blank=True)
+    gender = serializers.ChoiceField(
+        choices=ClientProfile.Gender.choices, required=False, allow_blank=True
+    )
+    date_of_birth = serializers.DateField(required=False, allow_null=True)
+    fitness_goals = serializers.CharField(required=False, allow_blank=True)
+    avatar = serializers.FileField(required=False, allow_null=True)
+    remove_avatar = serializers.BooleanField(required=False, default=False)
+
+    def validate_email(self, value):
+        value = value.strip().lower()
+        if not value:
+            return value
+        user = self.context["request"].user
+        if User.objects.filter(email=value).exclude(pk=user.pk).exists():
+            raise serializers.ValidationError("This email is already in use.")
+        if is_placeholder_email(value):
+            raise serializers.ValidationError("Choose a real email address.")
+        return value
+
+    def validate_phone(self, value):
+        value = value.strip()
+        user = self.context["request"].user
+        if value and User.objects.filter(phone=value).exclude(pk=user.pk).exists():
+            raise serializers.ValidationError("This phone number is already in use.")
+        return value
+
+    def validate_avatar(self, value):
+        if value and value.size > settings.MAX_UPLOAD_MB * 1024 * 1024:
+            raise serializers.ValidationError(
+                f"File is too large. Limit is {settings.MAX_UPLOAD_MB} MB."
+            )
+        return value
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        user = instance
+        user_fields = []
+        for field in ("full_name", "phone"):
+            if field in validated_data:
+                setattr(user, field, validated_data[field])
+                user_fields.append(field)
+
+        if "email" in validated_data:
+            email = validated_data["email"]
+            if email:
+                user.email = email
+                user_fields.append("email")
+            elif user.is_client:
+                phone = validated_data.get("phone", user.phone)
+                if not phone:
+                    raise serializers.ValidationError(
+                        {"email": "Add a phone number before removing your email."}
+                    )
+                user.email = placeholder_email()
+                user_fields.append("email")
+            else:
+                raise serializers.ValidationError(
+                    {"email": "Trainer accounts need an email address."}
+                )
+
+        if user_fields:
+            user.save(update_fields=user_fields)
+
+        profile = None
+        if user.is_client and hasattr(user, "client_profile"):
+            profile = user.client_profile
+            for field in ("gender", "date_of_birth", "fitness_goals"):
+                if field in validated_data:
+                    setattr(profile, field, validated_data[field])
+        elif user.is_trainer:
+            profile, _ = TrainerProfile.objects.get_or_create(user=user)
+            if "bio" in validated_data:
+                profile.bio = validated_data["bio"]
+
+        if profile is not None:
+            if validated_data.get("remove_avatar"):
+                profile.avatar = None
+            elif validated_data.get("avatar"):
+                profile.avatar = validated_data["avatar"]
+            profile.save()
         return user
 
 

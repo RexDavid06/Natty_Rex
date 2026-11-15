@@ -18,6 +18,7 @@ const ClientCalendarPage = lazy(() => import("./pages/client/CalendarPage").then
 const WorkoutPage = lazy(() => import("./pages/client/WorkoutPage").then((m) => ({ default: m.WorkoutPage })));
 const ClientHistoryPage = lazy(() => import("./pages/client/HistoryPage").then((m) => ({ default: m.ClientHistoryPage })));
 const ClientProgressPage = lazy(() => import("./pages/client/ProgressPage").then((m) => ({ default: m.ClientProgressPage })));
+const AccountPage = lazy(() => import("./pages/AccountPage").then((m) => ({ default: m.AccountPage })));
 const NotFoundPage = lazy(() => import("./pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage })));
 
 function RouteFallback() {
@@ -70,6 +71,7 @@ export default function App() {
         <Route path="programs" element={<ProgramsPage />} />
         <Route path="programs/:id" element={<ProgramBuilderPage />} />
         <Route path="exercises" element={<ExercisesPage />} />
+        <Route path="account" element={<AccountPage />} />
       </Route>
       <Route
         path="/app"
@@ -84,6 +86,7 @@ export default function App() {
         <Route path="workouts/:id" element={<WorkoutPage />} />
         <Route path="history" element={<ClientHistoryPage />} />
         <Route path="progress" element={<ClientProgressPage />} />
+        <Route path="account" element={<AccountPage />} />
       </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

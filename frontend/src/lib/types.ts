@@ -8,6 +8,10 @@ export interface User {
   phone: string;
   role: Role;
   avatar: string | null;
+  bio?: string;
+  gender?: string;
+  date_of_birth?: string | null;
+  fitness_goals?: string;
 }
 
 export interface AuthResponse {

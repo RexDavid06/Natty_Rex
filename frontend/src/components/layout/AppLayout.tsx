@@ -10,7 +10,9 @@ import {
   LibraryBig,
   LogOut,
   Menu,
+  Settings,
   TrendingUp,
+  UserRound,
   Users,
   X,
 } from "lucide-react";
@@ -27,6 +29,7 @@ const trainerNav = [
   { to: "/trainer/clients", label: "Clients", icon: Users },
   { to: "/trainer/programs", label: "Programs", icon: Dumbbell },
   { to: "/trainer/exercises", label: "Exercise library", icon: LibraryBig },
+  { to: "/trainer/account", label: "Account", icon: Settings },
 ];
 
 const clientNav = [
@@ -34,6 +37,7 @@ const clientNav = [
   { to: "/app/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/app/history", label: "History", icon: Dumbbell },
   { to: "/app/progress", label: "Progress", icon: TrendingUp },
+  { to: "/app/account", label: "Account", icon: UserRound },
 ];
 
 function useOnline() {

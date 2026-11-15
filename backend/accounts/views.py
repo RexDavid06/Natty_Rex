@@ -1,5 +1,6 @@
 from django.contrib.auth import logout as django_logout
 from rest_framework import generics, permissions, status
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
@@ -12,6 +13,7 @@ from .serializers import (
     LoginSerializer,
     NotificationSerializer,
     PasswordChangeSerializer,
+    ProfileUpdateSerializer,
     UserSerializer,
     token_pair_for_user,
 )
@@ -64,15 +66,18 @@ class LogoutView(APIView):
 
 
 class MeView(APIView):
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
     def get(self, request):
         return Response(UserSerializer(request.user, context={"request": request}).data)
 
     def patch(self, request):
-        allowed = {"full_name", "phone"}
-        for field in allowed:
-            if field in request.data:
-                setattr(request.user, field, request.data[field])
-        request.user.save(update_fields=[f for f in allowed if f in request.data])
+        serializer = ProfileUpdateSerializer(
+            request.user, data=request.data, partial=True, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        request.user.refresh_from_db()
         return Response(UserSerializer(request.user, context={"request": request}).data)
 
 
