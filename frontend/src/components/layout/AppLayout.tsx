@@ -1,44 +1,64 @@
-import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import {
-  CalendarDays,
-  ChevronRight,
-  Dumbbell,
-  Home,
-  LayoutDashboard,
-  LibraryBig,
-  LogOut,
-  Menu,
-  Settings,
-  TrendingUp,
-  UserRound,
-  Users,
-  X,
-} from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode, TouchEvent } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../lib/auth";
-import { cn } from "../../lib/utils";
 import { Logo } from "./Logo";
-import { Notifications } from "./Notifications";
 import { InstallAppButton } from "../InstallApp";
-import { Avatar, Button } from "../ui";
+import { Button } from "../ui";
 
-const trainerNav = [
-  { to: "/trainer/dashboard", label: "Overview", icon: LayoutDashboard },
-  { to: "/trainer/clients", label: "Clients", icon: Users },
-  { to: "/trainer/programs", label: "Programs", icon: Dumbbell },
-  { to: "/trainer/exercises", label: "Exercise library", icon: LibraryBig },
-  { to: "/trainer/account", label: "Account", icon: Settings },
+const trainerPages = [
+  "/trainer/dashboard",
+  "/trainer/clients",
+  "/trainer/programs",
+  "/trainer/exercises",
+  "/trainer/account",
 ];
 
-const clientNav = [
-  { to: "/app", label: "Today", icon: Home, end: true },
-  { to: "/app/calendar", label: "Calendar", icon: CalendarDays },
-  { to: "/app/history", label: "History", icon: Dumbbell },
-  { to: "/app/progress", label: "Progress", icon: TrendingUp },
-  { to: "/app/account", label: "Account", icon: UserRound },
+const clientPages = [
+  "/app",
+  "/app/calendar",
+  "/app/history",
+  "/app/progress",
+  "/app/account",
 ];
+
+function useSwipeNavigation(pages: string[]) {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+
+  const onTouchStart = (event: TouchEvent<HTMLElement>) => {
+    const target = event.target;
+    if (
+      target instanceof Element &&
+      target.closest("input, textarea, select, button, a, [data-no-swipe]")
+    ) {
+      touchStart.current = null;
+      return;
+    }
+    const touch = event.changedTouches[0];
+    touchStart.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const onTouchEnd = (event: TouchEvent<HTMLElement>) => {
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start) return;
+
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    if (Math.abs(deltaX) < 80 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+
+    const currentIndex = pages.indexOf(location.pathname);
+    if (currentIndex === -1) return;
+    const nextIndex = currentIndex + (deltaX < 0 ? 1 : -1);
+    const nextPage = pages[nextIndex];
+    if (nextPage) navigate(nextPage);
+  };
+
+  return { onTouchStart, onTouchEnd };
+}
 
 function useOnline() {
   const [online, setOnline] = useState(navigator.onLine);
@@ -66,207 +86,40 @@ export function OfflineBanner() {
 }
 
 export function TrainerLayout() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [location.key]);
-
-  const signOut = async () => {
-    await logout();
-    navigate("/login");
-  };
-
-  const closeMobile = () => setMobileOpen(false);
-
-  const sidebar = (onClose?: () => void) => (
-    <div className="flex h-full flex-col">
-      <div className="safe-top flex min-h-[calc(4rem+env(safe-area-inset-top))] items-center justify-between px-5">
-        <Logo to="/trainer/dashboard" onClick={onClose} />
-        {onClose && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            className="relative z-10 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-white/50 transition hover:bg-white/[0.08] hover:text-white"
-            aria-label="Close menu"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        )}
-      </div>
-      <nav className="mt-2 flex-1 space-y-1 px-3">
-        {trainerNav.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            onClick={() => onClose?.()}
-            className={({ isActive }) =>
-              cn(
-                "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
-                isActive
-                  ? "bg-lime-400/[0.09] text-lime-300"
-                  : "text-white/45 hover:bg-white/[0.04] hover:text-white",
-              )
-            }
-          >
-            <item.icon className="h-[18px] w-[18px]" />
-            {item.label}
-            <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-0 transition group-hover:opacity-40" />
-          </NavLink>
-        ))}
-      </nav>
-      <div className="space-y-2 border-t border-white/[0.06] p-3">
-        <InstallAppButton />
-        <div className="flex items-center gap-2 rounded-xl p-2">
-          <Avatar name={user?.full_name} src={user?.avatar} size="sm" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-semibold text-white/85">{user?.full_name}</p>
-            <p className="text-[10px] uppercase tracking-wider text-lime-400/70">Trainer</p>
-          </div>
-          <button
-            onClick={signOut}
-            className="rounded-lg p-2 text-white/30 transition hover:bg-white/[0.05] hover:text-red-300"
-            title="Sign out"
-          >
-            <LogOut className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
+  const swipeHandlers = useSwipeNavigation(trainerPages);
   return (
-    <div className="min-h-screen lg:pl-64">
+    <div className="min-h-screen">
       <OfflineBanner />
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-white/[0.06] bg-ink-900/70 backdrop-blur-xl lg:block">
-        {sidebar()}
-      </aside>
-      <header className="safe-top sticky top-0 z-20 flex min-h-[calc(4rem+env(safe-area-inset-top))] items-center justify-between border-b border-white/[0.06] bg-ink-950/80 px-4 backdrop-blur-xl lg:px-8">
-        <div className="flex items-center gap-3 lg:hidden">
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="rounded-lg p-2 text-white/60 hover:bg-white/[0.05]"
-            aria-label="Open menu"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-          <Logo />
-        </div>
-        <div className="hidden items-center gap-2 text-xs text-white/30 lg:flex">
-          <span className="h-1.5 w-1.5 rounded-full bg-lime-400" />
-          Private trainer workspace
-        </div>
-        <div className="flex items-center gap-2">
-          <InstallAppButton compact />
-          <Notifications />
-          <div className="hidden lg:block">
-            <Avatar name={user?.full_name} src={user?.avatar} size="sm" />
-          </div>
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 pb-16 sm:px-6 lg:px-8 lg:py-8">
+      <main
+        {...swipeHandlers}
+        className="mx-auto min-h-screen w-full max-w-7xl touch-pan-y px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
+        aria-label="Trainer pages. Swipe left or right to change pages."
+      >
         <Outlet />
       </main>
-      <AnimatePresence>
-        {mobileOpen && (
-          <div key="trainer-mobile-nav" className="fixed inset-0 z-40 lg:hidden">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-              onClick={closeMobile}
-            />
-            <motion.aside
-              aria-label="Mobile navigation"
-              initial={{ x: -280 }}
-              animate={{ x: 0 }}
-              exit={{ x: -280 }}
-              transition={{ type: "spring", stiffness: 350, damping: 32 }}
-              className="relative z-10 h-full w-72 border-r border-white/10 bg-ink-900"
-            >
-              {sidebar(closeMobile)}
-            </motion.aside>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
 
 export function ClientLayout() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const signOut = async () => {
-    await logout();
-    navigate("/login");
-  };
-
+  const swipeHandlers = useSwipeNavigation(clientPages);
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen">
       <OfflineBanner />
-      <header className="safe-top sticky top-0 z-20 border-b border-white/[0.06] bg-ink-950/80 backdrop-blur-xl">
-        <div className="mx-auto flex min-h-[calc(4rem+env(safe-area-inset-top))] w-full max-w-4xl items-center justify-between px-4 sm:px-6">
-          <Logo to="/app" />
-          <div className="flex items-center gap-2">
-            <InstallAppButton compact />
-            <Notifications />
-            <button
-              onClick={signOut}
-              className="rounded-lg p-2 text-white/35 transition hover:text-white"
-              title="Sign out"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-            <Avatar name={user?.full_name} src={user?.avatar} size="sm" />
-          </div>
-        </div>
-      </header>
-      <main className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 sm:py-7">
+      <main
+        {...swipeHandlers}
+        className="mx-auto min-h-screen w-full max-w-4xl touch-pan-y px-4 py-5 sm:px-6 sm:py-7"
+        aria-label="Client pages. Swipe left or right to change pages."
+      >
         <Outlet />
       </main>
-      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-30 border-t border-white/[0.07] bg-ink-900/95 px-2 pt-1.5 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-md items-center justify-around">
-          {clientNav.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                cn(
-                  "flex min-w-[64px] flex-col items-center gap-1 rounded-xl px-3 py-2 text-[10px] font-medium transition",
-                  isActive ? "text-lime-300" : "text-white/35 hover:text-white/70",
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <span
-                    className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded-xl transition",
-                      isActive && "bg-lime-400/10",
-                    )}
-                  >
-                    <item.icon className="h-[18px] w-[18px]" />
-                  </span>
-                  {item.label}
-                </>
-              )}
-            </NavLink>
-          ))}
-        </div>
-      </nav>
     </div>
   );
 }
 
 export function AuthLayout({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  void user;
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
       <div className="absolute inset-0 grid-faint opacity-60" />
