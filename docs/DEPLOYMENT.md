@@ -82,7 +82,16 @@ Provision the trainer from the Render shell:
 python manage.py create_trainer --email trainer@example.com --name "Coach Rex"
 ```
 
-Deploy the frontend separately as a Static Site (build command `npm ci && npm run build`, publish directory `dist`) with `VITE_API_URL=https://nattyrex-backend.onrender.com/api/v1`.
+Deploy the frontend separately as a Render **Static Site**:
+
+1. Create a **Static Site** from this repository.
+2. Set **Root Directory** to `frontend`.
+3. Set **Build Command** to `npm ci && npm run build`.
+4. Set **Publish Directory** to `dist`.
+5. Add environment variable `VITE_API_URL=https://<your-backend-host>/api/v1` (this is baked into the build).
+6. SPA routing is handled by `frontend/public/_redirects` (`/* /index.html 200`), so deep links like `/invite/<token>` and `/app/...` resolve correctly.
+
+After changing the frontend host, update backend `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, and `ALLOWED_HOSTS` to include the new Render frontend origin. Redeploy the frontend after any `VITE_API_URL` change.
 
 ## 3. Provision the trainer
 

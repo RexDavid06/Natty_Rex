@@ -135,7 +135,13 @@ cd backend && docker compose exec backend python manage.py create_trainer \
   --email trainer@example.com --name "Coach Rex"
 ```
 
-The stack contains PostgreSQL, Gunicorn/Django, and nginx serving the built PWA while proxying `/api`, `/admin`, `/static` and `/media`. Put a TLS-terminating reverse proxy or load balancer in front of port 80, enable `SECURE_SSL_REDIRECT=True`, and back up PostgreSQL plus the media volume. Full instructions: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+The stack contains PostgreSQL, Gunicorn/Django, and nginx serving the built PWA while proxying `/api`, `/admin`, `/static` and `/media`. Put a TLS-terminating reverse proxy or load balancer in front of port 80, enable `SECURE_SSL_REDIRECT=True`, and back up PostgreSQL plus the media volume.
+
+## Frontend on Render
+
+To host the frontend as a Render Static Site (instead of Vercel or the Docker/nginx frontend): set root directory `frontend`, build `npm ci && npm run build`, publish `dist`, and set `VITE_API_URL` to your backend API URL. SPA deep links are supported via `frontend/public/_redirects`. Update backend CORS/CSRF/frontend URL env vars to the Render origin.
+
+Full instructions: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Local constraints (Termux / Android)
 
