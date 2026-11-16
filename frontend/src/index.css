@@ -71,6 +71,9 @@
       linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
     background-size: 44px 44px;
   }
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
   .safe-bottom {
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
   }

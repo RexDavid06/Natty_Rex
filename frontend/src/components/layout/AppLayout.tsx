@@ -75,10 +75,23 @@ export function TrainerLayout() {
     navigate("/login");
   };
 
-  const sidebar = (
+  const sidebar = (onClose?: () => void) => (
     <div className="flex h-full flex-col">
-      <div className="flex h-16 items-center px-5">
+      <div className="safe-top flex min-h-[calc(4rem+env(safe-area-inset-top))] items-center justify-between px-5">
         <Logo to="/trainer/dashboard" />
+        {onClose && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="relative z-10 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-white/50 transition hover:bg-white/[0.08] hover:text-white"
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
       <nav className="mt-2 flex-1 space-y-1 px-3">
         {trainerNav.map((item) => (
@@ -125,9 +138,9 @@ export function TrainerLayout() {
     <div className="min-h-screen lg:pl-64">
       <OfflineBanner />
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-white/[0.06] bg-ink-900/70 backdrop-blur-xl lg:block">
-        {sidebar}
+        {sidebar()}
       </aside>
-      <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-white/[0.06] bg-ink-950/80 px-4 backdrop-blur-xl lg:px-8">
+      <header className="safe-top sticky top-0 z-20 flex min-h-[calc(4rem+env(safe-area-inset-top))] items-center justify-between border-b border-white/[0.06] bg-ink-950/80 px-4 backdrop-blur-xl lg:px-8">
         <div className="flex items-center gap-3 lg:hidden">
           <button
             onClick={() => setMobileOpen(true)}
@@ -155,7 +168,7 @@ export function TrainerLayout() {
       </main>
       <AnimatePresence>
         {mobileOpen && (
-          <div className="fixed inset-0 z-40 lg:hidden">
+          <div key="trainer-mobile-nav" className="fixed inset-0 z-40 lg:hidden">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -168,22 +181,9 @@ export function TrainerLayout() {
               animate={{ x: 0 }}
               exit={{ x: -280 }}
               transition={{ type: "spring", stiffness: 350, damping: 32 }}
-              className="relative h-full w-72 border-r border-white/10 bg-ink-900"
+              className="relative z-10 h-full w-72 border-r border-white/10 bg-ink-900"
             >
-              {sidebar}
-              <button
-                type="button"
-                aria-label="Close menu"
-                onPointerDown={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  setMobileOpen(false);
-                }}
-                onClick={() => setMobileOpen(false)}
-                className="absolute right-3 top-4 z-50 rounded-lg bg-ink-900/90 p-2 text-white/50 transition hover:bg-white/[0.08] hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              {sidebar(() => setMobileOpen(false))}
             </motion.aside>
           </div>
         )}
@@ -202,8 +202,8 @@ export function ClientLayout() {
   return (
     <div className="min-h-screen pb-24">
       <OfflineBanner />
-      <header className="sticky top-0 z-20 border-b border-white/[0.06] bg-ink-950/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-4xl items-center justify-between px-4 sm:px-6">
+      <header className="safe-top sticky top-0 z-20 border-b border-white/[0.06] bg-ink-950/80 backdrop-blur-xl">
+        <div className="mx-auto flex min-h-[calc(4rem+env(safe-area-inset-top))] w-full max-w-4xl items-center justify-between px-4 sm:px-6">
           <Logo to="/app" />
           <div className="flex items-center gap-2">
             <InstallAppButton compact />
