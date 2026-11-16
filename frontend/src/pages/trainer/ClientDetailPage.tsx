@@ -574,7 +574,7 @@ function EditClientModal({ client, open, onClose, onSaved }: { client: Client; o
           <Field label="Email">
             <Input type="email" value={form.email} onChange={set("email")} />
           </Field>
-          <Field label="Date of birth">
+          <Field label="Date of birth" hint="Optional">
             <Input type="date" value={form.date_of_birth ?? ""} onChange={set("date_of_birth")} />
           </Field>
           <Field label="Gender">

@@ -135,27 +135,32 @@ function SectionPager({ pages, ariaLabel }: { pages: NavPage[]; ariaLabel: strin
       className="sticky top-0 z-40 mb-4 border-b border-white/[0.06] bg-ink-950/85 py-2 backdrop-blur-xl"
       aria-label={ariaLabel}
     >
-      <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {pages.map((page, index) => {
-          const active = index === currentIndex;
-          return (
-            <NavLink
-              key={page.to}
-              to={page.to}
-              end={page.to === "/app"}
-              aria-current={active ? "page" : undefined}
-              data-no-swipe
-              className={cn(
-                "focus-ring shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition",
-                active
-                  ? "border-lime-400/30 bg-lime-400/15 text-lime-300"
-                  : "border-white/10 bg-white/[0.03] text-white/45 hover:text-white hover:bg-white/[0.06]",
-              )}
-            >
-              {page.label}
-            </NavLink>
-          );
-        })}
+      <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {pages.map((page, index) => {
+            const active = index === currentIndex;
+            return (
+              <NavLink
+                key={page.to}
+                to={page.to}
+                end={page.to === "/app"}
+                aria-current={active ? "page" : undefined}
+                data-no-swipe
+                className={cn(
+                  "focus-ring shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition",
+                  active
+                    ? "border-lime-400/30 bg-lime-400/15 text-lime-300"
+                    : "border-white/10 bg-white/[0.03] text-white/45 hover:text-white hover:bg-white/[0.06]",
+                )}
+              >
+                {page.label}
+              </NavLink>
+            );
+          })}
+        </div>
+        <div className="shrink-0 pb-1" data-no-swipe>
+          <InstallAppButton compact />
+        </div>
       </div>
       <p className="sr-only" aria-live="polite">
         Section {currentIndex + 1} of {pages.length}: {pages[currentIndex].label}

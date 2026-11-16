@@ -155,7 +155,7 @@ export function AddClientModal({ open, onClose, onCreated }: Props) {
                 <option value="OTHER">Other</option>
               </Select>
             </Field>
-            <Field label="Date of birth">
+            <Field label="Date of birth" hint="Optional">
               <Input type="date" value={form.date_of_birth} onChange={set("date_of_birth")} />
             </Field>
           </div>
