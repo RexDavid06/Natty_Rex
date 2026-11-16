@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode, TouchEvent } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../../lib/auth";
 import { Logo } from "./Logo";
 import { InstallAppButton } from "../InstallApp";
 import { Button } from "../ui";
@@ -22,20 +21,37 @@ const clientPages = [
   "/app/account",
 ];
 
+const swipeIgnoreSelector = [
+  "input",
+  "textarea",
+  "select",
+  "button",
+  "a",
+  "[contenteditable='true']",
+  "[role='slider']",
+  "[role='dialog']",
+  "[data-no-swipe]",
+  "[data-swipe-ignore]",
+  "[data-radix-scroll-area-viewport]",
+].join(", ");
+
 function useSwipeNavigation(pages: string[]) {
   const location = useLocation();
   const navigate = useNavigate();
   const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   const onTouchStart = (event: TouchEvent<HTMLElement>) => {
-    const target = event.target;
-    if (
-      target instanceof Element &&
-      target.closest("input, textarea, select, button, a, [data-no-swipe]")
-    ) {
+    if (event.touches.length !== 1) {
       touchStart.current = null;
       return;
     }
+
+    const target = event.target;
+    if (target instanceof Element && target.closest(swipeIgnoreSelector)) {
+      touchStart.current = null;
+      return;
+    }
+
     const touch = event.changedTouches[0];
     touchStart.current = { x: touch.clientX, y: touch.clientY };
   };
@@ -43,17 +59,22 @@ function useSwipeNavigation(pages: string[]) {
   const onTouchEnd = (event: TouchEvent<HTMLElement>) => {
     const start = touchStart.current;
     touchStart.current = null;
-    if (!start) return;
+    if (!start || event.changedTouches.length !== 1) return;
 
     const touch = event.changedTouches[0];
     const deltaX = touch.clientX - start.x;
     const deltaY = touch.clientY - start.y;
-    if (Math.abs(deltaX) < 80 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+    // Require a deliberate horizontal gesture; ordinary vertical scrolling stays native.
+    if (Math.abs(deltaX) < 72 || Math.abs(deltaX) < Math.abs(deltaY) * 1.35) return;
 
-    const currentIndex = pages.indexOf(location.pathname);
-    if (currentIndex === -1) return;
-    const nextIndex = currentIndex + (deltaX < 0 ? 1 : -1);
-    const nextPage = pages[nextIndex];
+    // Nested detail routes (e.g. client profile/workout) belong to their parent section.
+    const currentIndex = pages
+      .map((page, index) => ({ page, index }))
+      .filter(({ page }) => location.pathname === page || location.pathname.startsWith(`${page}/`))
+      .sort((a, b) => b.page.length - a.page.length)[0]?.index;
+    if (currentIndex === undefined) return;
+
+    const nextPage = pages[currentIndex + (deltaX < 0 ? 1 : -1)];
     if (nextPage) navigate(nextPage);
   };
 
@@ -93,7 +114,7 @@ export function TrainerLayout() {
       <main
         {...swipeHandlers}
         className="mx-auto min-h-screen w-full max-w-7xl touch-pan-y px-4 py-6 sm:px-6 lg:px-8 lg:py-8"
-        aria-label="Trainer pages. Swipe left or right to change pages."
+        aria-label="Trainer workspace. Swipe horizontally to move between sections."
       >
         <Outlet />
       </main>
@@ -109,7 +130,7 @@ export function ClientLayout() {
       <main
         {...swipeHandlers}
         className="mx-auto min-h-screen w-full max-w-4xl touch-pan-y px-4 py-5 sm:px-6 sm:py-7"
-        aria-label="Client pages. Swipe left or right to change pages."
+        aria-label="Client app. Swipe horizontally to move between sections."
       >
         <Outlet />
       </main>
@@ -118,8 +139,6 @@ export function ClientLayout() {
 }
 
 export function AuthLayout({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
-  void user;
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
       <div className="absolute inset-0 grid-faint opacity-60" />
