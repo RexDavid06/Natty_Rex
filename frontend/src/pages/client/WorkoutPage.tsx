@@ -99,7 +99,7 @@ export function WorkoutPage() {
   const allDone = data.exercises.length > 0 && data.completed_exercises === data.total_exercises;
 
   return (
-    <div className="animate-fade-up pb-24">
+    <div className="animate-fade-up pb-24" data-no-swipe>
       <button onClick={() => navigate(-1)} className="mb-4 inline-flex items-center gap-1.5 text-xs text-white/35 transition hover:text-white">
         <ArrowLeft className="h-4 w-4" /> Back
       </button>

@@ -162,7 +162,7 @@ export function ProgramBuilderPage() {
   );
 
   return (
-    <div className="animate-fade-up">
+    <div className="animate-fade-up" data-no-swipe>
       <Link to="/trainer/programs" className="mb-5 inline-flex items-center gap-1.5 text-xs text-white/35 hover:text-white">
         <ArrowLeft className="h-3.5 w-3.5" /> All programs
       </Link>
