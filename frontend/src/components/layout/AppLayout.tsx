@@ -73,17 +73,19 @@ export function TrainerLayout() {
 
   useEffect(() => {
     setMobileOpen(false);
-  }, [location.pathname]);
+  }, [location.key]);
 
   const signOut = async () => {
     await logout();
     navigate("/login");
   };
 
+  const closeMobile = () => setMobileOpen(false);
+
   const sidebar = (onClose?: () => void) => (
     <div className="flex h-full flex-col">
       <div className="safe-top flex min-h-[calc(4rem+env(safe-area-inset-top))] items-center justify-between px-5">
-        <Logo to="/trainer/dashboard" />
+        <Logo to="/trainer/dashboard" onClick={onClose} />
         {onClose && (
           <button
             type="button"
@@ -103,7 +105,7 @@ export function TrainerLayout() {
           <NavLink
             key={item.to}
             to={item.to}
-            onClick={() => setMobileOpen(false)}
+            onClick={() => onClose?.()}
             className={({ isActive }) =>
               cn(
                 "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
@@ -179,16 +181,17 @@ export function TrainerLayout() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-              onClick={() => setMobileOpen(false)}
+              onClick={closeMobile}
             />
             <motion.aside
+              aria-label="Mobile navigation"
               initial={{ x: -280 }}
               animate={{ x: 0 }}
               exit={{ x: -280 }}
               transition={{ type: "spring", stiffness: 350, damping: 32 }}
               className="relative z-10 h-full w-72 border-r border-white/10 bg-ink-900"
             >
-              {sidebar(() => setMobileOpen(false))}
+              {sidebar(closeMobile)}
             </motion.aside>
           </div>
         )}

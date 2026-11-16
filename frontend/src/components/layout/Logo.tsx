@@ -1,9 +1,17 @@
 import { Link } from "react-router-dom";
 import { cn } from "../../lib/utils";
 
-export function Logo({ compact = false, to = "/" }: { compact?: boolean; to?: string }) {
+export function Logo({
+  compact = false,
+  to = "/",
+  onClick,
+}: {
+  compact?: boolean;
+  to?: string;
+  onClick?: () => void;
+}) {
   return (
-    <Link to={to} className="group inline-flex items-center gap-2.5">
+    <Link to={to} onClick={onClick} className="group inline-flex items-center gap-2.5">
       <span className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-lime-400 text-ink-950 shadow-[0_0_22px_rgba(198,249,74,0.25)]">
         <span className="font-display text-lg font-bold leading-none">N</span>
         <span className="absolute -right-2 -top-2 h-4 w-4 rotate-45 bg-white/25" />
