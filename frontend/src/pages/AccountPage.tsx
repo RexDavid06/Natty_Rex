@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
-import { Camera, KeyRound, Save, ShieldCheck, Trash2 } from "lucide-react";
+import { Camera, KeyRound, LogOut, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { User } from "../lib/types";
@@ -20,10 +21,21 @@ import {
 } from "../components/ui";
 
 export function AccountPage() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, logout } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const fileInput = useRef<HTMLInputElement>(null);
   const profileInitializedFor = useRef<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    try {
+      await logout();
+    } finally {
+      navigate("/login", { replace: true });
+    }
+  };
 
   const {
     value: form,
@@ -160,6 +172,11 @@ export function AccountPage() {
         title="Account"
         eyebrow="Your details"
         subtitle="Edit the personal information on your account and keep your sign-in secure."
+        actions={
+          <Button variant="secondary" onClick={handleSignOut} loading={signingOut}>
+            <LogOut className="h-4 w-4" /> Sign out
+          </Button>
+        }
       />
 
       <div className="grid gap-4 lg:grid-cols-[1.25fr_0.75fr]">
