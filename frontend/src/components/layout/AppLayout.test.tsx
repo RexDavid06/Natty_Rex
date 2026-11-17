@@ -1,10 +1,17 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ClientLayout, TrainerLayout } from "./AppLayout";
 
+const auth = vi.hoisted(() => ({ user: null as unknown }));
+
 vi.mock("../InstallApp", () => ({ InstallAppButton: () => null }));
+vi.mock("../../lib/auth", () => ({ useAuth: () => auth }));
+
+afterEach(() => {
+  auth.user = null;
+});
 
 function renderTrainer(path: string) {
   return render(
@@ -71,6 +78,25 @@ describe("Section navigation layout", () => {
     expect(within(nav).getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
     await user.click(within(nav).getByRole("link", { name: "Progress" }));
     expect(await screen.findByText("Progress page")).toBeInTheDocument();
+  });
+
+  it("shows the client's trainer avatar from their profile", () => {
+    auth.user = {
+      id: "u1",
+      trainer: {
+        id: "t1",
+        full_name: "Coach Rex",
+        first_name: "Rex",
+        last_name: "Coach",
+        avatar: "https://cdn.example.com/coach.png",
+      },
+    };
+    renderClient("/app");
+    expect(screen.getByAltText("Coach Rex")).toHaveAttribute(
+      "src",
+      "https://cdn.example.com/coach.png",
+    );
+    expect(screen.getByTitle("Your trainer: Coach Rex")).toBeInTheDocument();
   });
 
   it("keeps section pager visible on workout detail routes", () => {

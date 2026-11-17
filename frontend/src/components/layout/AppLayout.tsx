@@ -3,7 +3,9 @@ import type { ReactNode, TouchEvent } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Logo } from "./Logo";
 import { InstallAppButton } from "../InstallApp";
-import { Button } from "../ui";
+import { Avatar, Button } from "../ui";
+import { useAuth } from "../../lib/auth";
+import type { TrainerBadge } from "../../lib/types";
 import { cn } from "../../lib/utils";
 
 type NavPage = { to: string; label: string };
@@ -124,7 +126,7 @@ export function OfflineBanner() {
   );
 }
 
-function SectionPager({ pages, ariaLabel }: { pages: NavPage[]; ariaLabel: string }) {
+function SectionPager({ pages, ariaLabel, trailing }: { pages: NavPage[]; ariaLabel: string; trailing?: ReactNode }) {
   const location = useLocation();
   const currentIndex = resolveSectionIndex(location.pathname, pages);
 
@@ -158,7 +160,8 @@ function SectionPager({ pages, ariaLabel }: { pages: NavPage[]; ariaLabel: strin
             );
           })}
         </div>
-        <div className="shrink-0 pb-1" data-no-swipe>
+        <div className="flex shrink-0 items-center gap-2 pb-1" data-no-swipe>
+          {trailing}
           <InstallAppButton compact />
         </div>
       </div>
@@ -191,8 +194,24 @@ export function TrainerLayout() {
   );
 }
 
+function TrainerChip({ trainer }: { trainer: TrainerBadge }) {
+  return (
+    <div
+      className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] py-1 pl-1 pr-1 sm:pr-2.5"
+      title={`Your trainer: ${trainer.full_name}`}
+    >
+      <Avatar name={trainer.full_name} src={trainer.avatar} size="xs" />
+      <span className="hidden text-[10px] font-medium text-white/50 sm:inline">
+        {trainer.first_name || "Coach"}
+      </span>
+    </div>
+  );
+}
+
 export function ClientLayout() {
   const location = useLocation();
+  const { user } = useAuth();
+  const trainer = user?.trainer;
   const swipeEnabled = !shouldDisableSwipe(location.pathname, clientPages);
   const swipeHandlers = useSwipeNavigation(clientPages, swipeEnabled);
   return (
@@ -206,7 +225,11 @@ export function ClientLayout() {
         )}
         aria-label="Client app. Swipe horizontally or use section links to move between sections."
       >
-        <SectionPager pages={clientPages} ariaLabel="Client sections" />
+        <SectionPager
+          pages={clientPages}
+          ariaLabel="Client sections"
+          trailing={trainer ? <TrainerChip trainer={trainer} /> : null}
+        />
         <Outlet />
       </main>
     </div>

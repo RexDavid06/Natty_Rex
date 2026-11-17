@@ -45,6 +45,7 @@ def _validate_birthday(month, day):
 class UserSerializer(serializers.ModelSerializer):
     display_name = serializers.CharField(source="full_name", read_only=True)
     avatar = serializers.SerializerMethodField()
+    trainer = serializers.SerializerMethodField()
     bio = serializers.SerializerMethodField()
     gender = serializers.SerializerMethodField()
     birth_month = serializers.SerializerMethodField()
@@ -55,7 +56,7 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             "id", "email", "full_name", "first_name", "last_name", "display_name",
-            "phone", "role", "avatar", "bio", "gender", "birth_month",
+            "phone", "role", "avatar", "trainer", "bio", "gender", "birth_month",
             "birth_day", "fitness_goals",
         ]
         read_only_fields = [
@@ -63,14 +64,36 @@ class UserSerializer(serializers.ModelSerializer):
             "bio", "gender", "birth_month", "birth_day", "fitness_goals",
         ]
 
-    def get_avatar(self, obj):
-        profile = getattr(obj, "client_profile", None) or getattr(
-            obj, "trainer_profile", None
+    def _avatar_url(self, user) -> str | None:
+        profile = getattr(user, "client_profile", None) or getattr(
+            user, "trainer_profile", None
         )
         if profile and profile.avatar:
             request = self.context.get("request")
-            return request.build_absolute_uri(profile.avatar.url) if request else profile.avatar.url
+            return (
+                request.build_absolute_uri(profile.avatar.url)
+                if request
+                else profile.avatar.url
+            )
         return None
+
+    def get_avatar(self, obj):
+        return self._avatar_url(obj)
+
+    def get_trainer(self, obj):
+        if not obj.is_client:
+            return None
+        profile = getattr(obj, "client_profile", None)
+        trainer = profile.trainer if profile else None
+        if not trainer:
+            return None
+        return {
+            "id": str(trainer.id),
+            "full_name": trainer.full_name,
+            "first_name": trainer.first_name,
+            "last_name": trainer.last_name,
+            "avatar": self._avatar_url(trainer),
+        }
 
     def get_bio(self, obj) -> str:
         profile = getattr(obj, "trainer_profile", None)

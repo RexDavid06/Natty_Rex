@@ -74,7 +74,7 @@ CSRF_TRUSTED_ORIGINS=https://<your-frontend-host>
 
 On Neon, use the pooled connection string (host contains `-pooler`) for `DATABASE_URL` and the direct one for `DATABASE_URL_UNPOOLED`. Both are TCP URLs; Neon only accepts TCP connections, not Unix sockets. `DATABASE_URL_UNPOOLED` is optional — if unset, migrations fall back to `DATABASE_URL`. The entrypoint automatically runs migrations over the direct connection and serves requests over the pooled one.
 
-`SECURE_SSL_REDIRECT` defaults to `True` when `DEBUG=False`, which is correct behind Render's HTTPS proxy. Attach a persistent disk mounted at `/app/media` if uploaded videos must survive deploys.
+`SECURE_SSL_REDIRECT` defaults to `True` when `DEBUG=False`, which is correct behind Render's HTTPS proxy. Django serves uploaded media from `/media/`; attach a persistent disk mounted at `/app/media` so avatars, videos, and thumbnails survive deploys and restarts.
 
 Provision the trainer from the Render shell:
 
@@ -185,7 +185,7 @@ Migrations and static collection run automatically at container start. The exerc
 | CSRF failures in admin | `CSRF_TRUSTED_ORIGINS` matches the HTTPS origin |
 | Redirect loop behind TLS proxy | `X-Forwarded-Proto` preserved; `SECURE_SSL_REDIRECT=True` |
 | Uploads 413 | `MAX_UPLOAD_MB` and nginx `client_max_body_size` |
-| Media 404 | media volume mounted in backend and nginx; files exist under `/app/media` |
+| Media/avatar 404 | files exist under `/app/media`; on Render, attach a persistent disk at `/app/media` (Django serves `/media/` in production) |
 | PWA serves old JS | `/sw.js` must be served no-cache; a new deploy shows the in-app update prompt |
 | PostgreSQL won't initialise on Termux | Local SQLite is expected there; use PostgreSQL on a normal server |
 

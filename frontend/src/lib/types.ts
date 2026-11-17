@@ -1,5 +1,13 @@
 export type Role = "TRAINER" | "CLIENT";
 
+export interface TrainerBadge {
+  id: string;
+  full_name: string;
+  first_name: string;
+  last_name: string;
+  avatar: string | null;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -10,6 +18,7 @@ export interface User {
   phone: string;
   role: Role;
   avatar: string | null;
+  trainer?: TrainerBadge | null;
   bio?: string;
   gender?: string;
   birth_month?: number | null;

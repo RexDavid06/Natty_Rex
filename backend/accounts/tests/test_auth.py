@@ -9,7 +9,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from accounts.models import ClientInvitation, Notification, User
-from accounts.services import create_invitation
+from accounts.services import create_invitation, ensure_trainer_profile
 
 from .helpers import make_client, make_trainer
 
@@ -29,6 +29,34 @@ class AuthenticationTests(APITestCase):
         self.assertIn("access", response.data)
         self.assertIn("refresh", response.data)
         self.assertEqual(response.data["user"]["role"], User.Role.TRAINER)
+
+    def test_client_me_includes_trainer_badge(self):
+        client = make_client(self.trainer, email="badge@example.com")
+        self.client.force_authenticate(client.user)
+
+        response = self.client.get(reverse("me"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["trainer"]["id"], str(self.trainer.id))
+        self.assertEqual(response.data["trainer"]["full_name"], self.trainer.full_name)
+        self.assertIsNone(response.data["trainer"]["avatar"])
+
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                ensure_trainer_profile(self.trainer)
+                self.trainer.trainer_profile.avatar = SimpleUploadedFile(
+                    "coach.png", b"fake-image-bytes", content_type="image/png"
+                )
+                self.trainer.trainer_profile.save(update_fields=["avatar"])
+
+                response = self.client.get(reverse("me"))
+                self.assertEqual(response.status_code, status.HTTP_200_OK)
+                self.assertIn("coach.png", response.data["trainer"]["avatar"])
+
+    def test_trainer_me_has_no_trainer_badge(self):
+        self.client.force_authenticate(self.trainer)
+        response = self.client.get(reverse("me"))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsNone(response.data["trainer"])
 
     def test_login_with_phone(self):
         profile = make_client(

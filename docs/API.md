@@ -32,15 +32,21 @@ Login response:
 {
   "access": "…",
   "refresh": "…",
-  "user": { "id": "…", "email": "…", "full_name": "…", "first_name": "…", "last_name": "…", "role": "TRAINER", "avatar": null }
+  "user": {
+    "id": "…", "email": "…", "full_name": "…", "first_name": "…", "last_name": "…",
+    "role": "CLIENT", "avatar": null,
+    "trainer": { "id": "…", "full_name": "…", "first_name": "…", "last_name": "…", "avatar": null }
+  }
 }
 ```
+
+For client accounts, `user.trainer` carries the assigned trainer's name and profile image URL; trainer accounts receive `null`.
 
 ## Account (authenticated)
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET/PATCH | `/auth/me/` | Read/update name and phone |
+| GET/PATCH | `/auth/me/` | Read/update name and phone; includes the client's trainer badge |
 | POST | `/auth/password/` | Change password (`current_password`, `new_password`) |
 | GET | `/auth/notifications/` | Paginated notifications |
 | POST | `/auth/notifications/<id>/read/` | Mark one read |
