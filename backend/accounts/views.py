@@ -178,6 +178,8 @@ class InvitationPreviewView(APIView):
             {
                 "valid": True,
                 "client_name": invitation.client.full_name,
+                "client_first_name": invitation.client.user.first_name
+                or invitation.client.full_name.split(" ")[0],
                 "email_required": is_placeholder_email(invitation.client.user.email),
                 "expires_at": invitation.expires_at,
             }

@@ -4,13 +4,16 @@ export interface User {
   id: string;
   email: string;
   full_name: string;
+  first_name: string;
+  last_name: string;
   display_name: string;
   phone: string;
   role: Role;
   avatar: string | null;
   bio?: string;
   gender?: string;
-  date_of_birth?: string | null;
+  birth_month?: number | null;
+  birth_day?: number | null;
   fitness_goals?: string;
 }
 
@@ -43,10 +46,13 @@ export interface Client {
   id: string;
   client_id: string;
   full_name: string;
+  first_name: string;
+  last_name: string;
   email: string;
   phone: string;
   gender: string;
-  date_of_birth: string | null;
+  birth_month: number | null;
+  birth_day: number | null;
   fitness_goals: string;
   training_notes: string;
   avatar: string | null;

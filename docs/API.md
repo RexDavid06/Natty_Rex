@@ -23,7 +23,7 @@ List endpoints are paginated with `count`, `next`, `previous`, `results` unless 
 | POST | `/auth/login/` | Login with `identifier` (email or phone) and `password` |
 | POST | `/auth/refresh/` | Rotate refresh token |
 | POST | `/auth/logout/` | Blacklist refresh token |
-| GET | `/auth/invitations/preview/?token=…` | Validate invitation, return client name |
+| GET | `/auth/invitations/preview/?token=…` | Validate invitation, return client name and first name |
 | POST | `/auth/invitations/accept/` | Set password, activate account, return tokens |
 
 Login response:
@@ -32,7 +32,7 @@ Login response:
 {
   "access": "…",
   "refresh": "…",
-  "user": { "id": "…", "email": "…", "full_name": "…", "role": "TRAINER", "avatar": null }
+  "user": { "id": "…", "email": "…", "full_name": "…", "first_name": "…", "last_name": "…", "role": "TRAINER", "avatar": null }
 }
 ```
 
@@ -69,11 +69,13 @@ Creating a client body:
 
 ```json
 {
-  "full_name": "Jordan Lee",
+  "first_name": "Jordan",
+  "last_name": "Lee",
   "email": "jordan@example.com",
   "phone": "+15550101010",
   "gender": "PREFER_NOT_TO_SAY",
-  "date_of_birth": "1996-04-18",
+  "birth_month": 4,
+  "birth_day": 18,
   "fitness_goals": "Build strength",
   "training_notes": "Previous shoulder injury",
   "send_invitation": true

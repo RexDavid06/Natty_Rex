@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
@@ -10,23 +12,55 @@ from .models import ClientInvitation, ClientProfile, Notification, TrainerProfil
 from .services import PHONE_EMAIL_DOMAIN, is_placeholder_email, placeholder_email
 
 
+def _split_full_name(value: str) -> tuple[str, str]:
+    parts = (value or "").strip().split(None, 1)
+    if not parts:
+        return "", ""
+    return parts[0], parts[1] if len(parts) > 1 else ""
+
+
+def _compose_full_name(first_name: str, last_name: str) -> str:
+    return " ".join(
+        part for part in ((first_name or "").strip(), (last_name or "").strip()) if part
+    )
+
+
+def _validate_birthday(month, day):
+    if month is None and day is None:
+        return
+    if not month or not day:
+        raise serializers.ValidationError(
+            {"birth_month": "Choose both the month and day."}
+        )
+    if not 1 <= month <= 12:
+        raise serializers.ValidationError({"birth_month": "Choose a valid month."})
+    try:
+        date(2000, month, day)
+    except ValueError:
+        raise serializers.ValidationError(
+            {"birth_day": "Choose a valid day for the month."}
+        )
+
+
 class UserSerializer(serializers.ModelSerializer):
     display_name = serializers.CharField(source="full_name", read_only=True)
     avatar = serializers.SerializerMethodField()
     bio = serializers.SerializerMethodField()
     gender = serializers.SerializerMethodField()
-    date_of_birth = serializers.SerializerMethodField()
+    birth_month = serializers.SerializerMethodField()
+    birth_day = serializers.SerializerMethodField()
     fitness_goals = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
-            "id", "email", "full_name", "display_name", "phone", "role", "avatar",
-            "bio", "gender", "date_of_birth", "fitness_goals",
+            "id", "email", "full_name", "first_name", "last_name", "display_name",
+            "phone", "role", "avatar", "bio", "gender", "birth_month",
+            "birth_day", "fitness_goals",
         ]
         read_only_fields = [
-            "id", "role", "display_name", "avatar", "bio", "gender",
-            "date_of_birth", "fitness_goals",
+            "id", "role", "display_name", "first_name", "last_name", "avatar",
+            "bio", "gender", "birth_month", "birth_day", "fitness_goals",
         ]
 
     def get_avatar(self, obj):
@@ -46,9 +80,13 @@ class UserSerializer(serializers.ModelSerializer):
         profile = getattr(obj, "client_profile", None)
         return profile.gender if profile else ""
 
-    def get_date_of_birth(self, obj) -> str | None:
+    def get_birth_month(self, obj) -> int | None:
         profile = getattr(obj, "client_profile", None)
-        return profile.date_of_birth.isoformat() if profile and profile.date_of_birth else None
+        return profile.birth_month if profile else None
+
+    def get_birth_day(self, obj) -> int | None:
+        profile = getattr(obj, "client_profile", None)
+        return profile.birth_day if profile else None
 
     def get_fitness_goals(self, obj) -> str:
         profile = getattr(obj, "client_profile", None)
@@ -137,13 +175,16 @@ class PasswordChangeSerializer(serializers.Serializer):
 
 class ProfileUpdateSerializer(serializers.Serializer):
     full_name = serializers.CharField(max_length=150, required=False)
+    first_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
     email = serializers.EmailField(required=False, allow_blank=True)
     phone = serializers.CharField(max_length=32, required=False, allow_blank=True)
     bio = serializers.CharField(required=False, allow_blank=True)
     gender = serializers.ChoiceField(
         choices=ClientProfile.Gender.choices, required=False, allow_blank=True
     )
-    date_of_birth = serializers.DateField(required=False, allow_null=True)
+    birth_month = serializers.IntegerField(required=False, allow_null=True)
+    birth_day = serializers.IntegerField(required=False, allow_null=True)
     fitness_goals = serializers.CharField(required=False, allow_blank=True)
     avatar = serializers.FileField(required=False, allow_null=True)
     remove_avatar = serializers.BooleanField(required=False, default=False)
@@ -173,14 +214,43 @@ class ProfileUpdateSerializer(serializers.Serializer):
             )
         return value
 
+    def validate(self, attrs):
+        if "first_name" in attrs or "last_name" in attrs:
+            first = attrs.get("first_name", self.instance.first_name)
+            last = attrs.get("last_name", self.instance.last_name)
+            if not _compose_full_name(first, last):
+                raise serializers.ValidationError({"first_name": "Enter a name."})
+        if "birth_month" in attrs or "birth_day" in attrs:
+            profile = getattr(self.instance, "client_profile", None)
+            _validate_birthday(
+                attrs.get("birth_month", profile.birth_month if profile else None),
+                attrs.get("birth_day", profile.birth_day if profile else None),
+            )
+        return attrs
+
     @transaction.atomic
     def update(self, instance, validated_data):
         user = instance
         user_fields = []
-        for field in ("full_name", "phone"):
+        for field in ("phone",):
             if field in validated_data:
                 setattr(user, field, validated_data[field])
                 user_fields.append(field)
+
+        name_changed = False
+        if "first_name" in validated_data:
+            user.first_name = validated_data["first_name"].strip()
+            name_changed = True
+        if "last_name" in validated_data:
+            user.last_name = validated_data["last_name"].strip()
+            name_changed = True
+        if name_changed:
+            user.full_name = _compose_full_name(user.first_name, user.last_name)
+            user_fields.extend(["first_name", "last_name", "full_name"])
+        elif "full_name" in validated_data:
+            user.full_name = validated_data["full_name"].strip()
+            user.first_name, user.last_name = _split_full_name(user.full_name)
+            user_fields.extend(["full_name", "first_name", "last_name"])
 
         if "email" in validated_data:
             email = validated_data["email"]
@@ -206,7 +276,7 @@ class ProfileUpdateSerializer(serializers.Serializer):
         profile = None
         if user.is_client and hasattr(user, "client_profile"):
             profile = user.client_profile
-            for field in ("gender", "date_of_birth", "fitness_goals"):
+            for field in ("gender", "birth_month", "birth_day", "fitness_goals"):
                 if field in validated_data:
                     setattr(profile, field, validated_data[field])
         elif user.is_trainer:
@@ -227,6 +297,8 @@ class ClientProfileSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(source="user.id", read_only=True)
     client_id = serializers.UUIDField(source="id", read_only=True)
     full_name = serializers.CharField(source="user.full_name", read_only=True)
+    first_name = serializers.CharField(source="user.first_name", read_only=True)
+    last_name = serializers.CharField(source="user.last_name", read_only=True)
     email = serializers.SerializerMethodField()
     phone = serializers.CharField(source="user.phone", read_only=True)
     has_account = serializers.SerializerMethodField()
@@ -236,10 +308,10 @@ class ClientProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = ClientProfile
         fields = [
-            "id", "client_id", "full_name", "email", "phone", "gender",
-            "date_of_birth", "fitness_goals", "training_notes", "avatar",
-            "is_active_client", "has_account", "invitation", "assigned_programs",
-            "created_at", "updated_at",
+            "id", "client_id", "full_name", "first_name", "last_name", "email",
+            "phone", "gender", "birth_month", "birth_day", "fitness_goals",
+            "training_notes", "avatar", "is_active_client", "has_account",
+            "invitation", "assigned_programs", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "client_id", "created_at", "updated_at"]
 
@@ -275,26 +347,52 @@ class ClientProfileSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         user_data = validated_data.pop("user", {})
         user = instance.user
+        user_fields = []
         for field in ("full_name", "phone"):
             if field in user_data:
                 setattr(user, field, user_data[field])
-        user.save(update_fields=[k for k in ("full_name", "phone") if k in user_data])
+                user_fields.append(field)
+        if "full_name" in user_data:
+            user.first_name, user.last_name = _split_full_name(user.full_name)
+            user_fields.extend(["first_name", "last_name"])
+        if user_fields:
+            user.save(update_fields=user_fields)
         return super().update(instance, validated_data)
 
 
 class ClientCreateSerializer(serializers.Serializer):
-    full_name = serializers.CharField(max_length=150)
+    full_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    first_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
     email = serializers.EmailField(required=False, allow_blank=True)
     phone = serializers.CharField(max_length=32, required=False, allow_blank=True)
     gender = serializers.ChoiceField(
         choices=ClientProfile.Gender.choices, required=False, allow_blank=True
     )
-    date_of_birth = serializers.DateField(required=False, allow_null=True)
+    birth_month = serializers.IntegerField(required=False, allow_null=True)
+    birth_day = serializers.IntegerField(required=False, allow_null=True)
     fitness_goals = serializers.CharField(required=False, allow_blank=True)
     training_notes = serializers.CharField(required=False, allow_blank=True)
     send_invitation = serializers.BooleanField(default=True)
 
     def validate(self, attrs):
+        first = attrs.get("first_name", "").strip()
+        last = attrs.get("last_name", "").strip()
+        full = attrs.get("full_name", "").strip()
+        if not (first or last or full):
+            raise serializers.ValidationError(
+                {"first_name": "Enter the client's name."}
+            )
+        if first or last:
+            attrs["first_name"] = first
+            attrs["last_name"] = last
+            attrs["full_name"] = _compose_full_name(first, last)
+        else:
+            attrs["first_name"], attrs["last_name"] = _split_full_name(full)
+            attrs["full_name"] = full
+
+        _validate_birthday(attrs.get("birth_month"), attrs.get("birth_day"))
+
         if not attrs.get("email") and not attrs.get("phone"):
             raise serializers.ValidationError(
                 "Provide an email address or phone number."
@@ -346,12 +444,15 @@ class NotificationSerializer(serializers.ModelSerializer):
 
 class ClientUpdateSerializer(serializers.Serializer):
     full_name = serializers.CharField(max_length=150, required=False)
+    first_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=150, required=False, allow_blank=True)
     email = serializers.EmailField(required=False, allow_blank=True)
     phone = serializers.CharField(max_length=32, required=False, allow_blank=True)
     gender = serializers.ChoiceField(
         choices=ClientProfile.Gender.choices, required=False, allow_blank=True
     )
-    date_of_birth = serializers.DateField(required=False, allow_null=True)
+    birth_month = serializers.IntegerField(required=False, allow_null=True)
+    birth_day = serializers.IntegerField(required=False, allow_null=True)
     fitness_goals = serializers.CharField(required=False, allow_blank=True)
     training_notes = serializers.CharField(required=False, allow_blank=True)
 
@@ -371,10 +472,33 @@ class ClientUpdateSerializer(serializers.Serializer):
             raise serializers.ValidationError("This phone number is already in use.")
         return value
 
+    def validate(self, attrs):
+        if "first_name" in attrs or "last_name" in attrs:
+            first = attrs.get("first_name", self.instance.user.first_name)
+            last = attrs.get("last_name", self.instance.user.last_name)
+            if not _compose_full_name(first, last):
+                raise serializers.ValidationError({"first_name": "Enter a name."})
+        if "birth_month" in attrs or "birth_day" in attrs:
+            _validate_birthday(
+                attrs.get("birth_month", self.instance.birth_month),
+                attrs.get("birth_day", self.instance.birth_day),
+            )
+        return attrs
+
     def update(self, instance, validated_data):
         user = instance.user
-        if "full_name" in validated_data:
-            user.full_name = validated_data.pop("full_name")
+        name_changed = False
+        if "first_name" in validated_data:
+            user.first_name = validated_data["first_name"].strip()
+            name_changed = True
+        if "last_name" in validated_data:
+            user.last_name = validated_data["last_name"].strip()
+            name_changed = True
+        if name_changed:
+            user.full_name = _compose_full_name(user.first_name, user.last_name)
+        elif "full_name" in validated_data:
+            user.full_name = validated_data["full_name"].strip()
+            user.first_name, user.last_name = _split_full_name(user.full_name)
         if "email" in validated_data:
             email = validated_data.pop("email")
             if email:
@@ -383,7 +507,7 @@ class ClientUpdateSerializer(serializers.Serializer):
             user.phone = validated_data.pop("phone")
         user.save()
         for field in (
-            "gender", "date_of_birth", "fitness_goals", "training_notes",
+            "gender", "birth_month", "birth_day", "fitness_goals", "training_notes",
         ):
             if field in validated_data:
                 setattr(instance, field, validated_data[field])

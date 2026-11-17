@@ -12,6 +12,7 @@ import { PageHeader } from "../components/layout/AppLayout";
 import {
   Avatar,
   Badge,
+  BirthdayInput,
   Button,
   Card,
   Field,
@@ -42,13 +43,14 @@ export function AccountPage() {
     setValue: setForm,
     restored: profileDraftRestored,
     clear: clearProfileDraft,
-  } = useDraftState(`account.${user?.id ?? "anonymous"}.profile`, {
+  } = useDraftState(`account.${user?.id ?? "anonymous"}.profile.v2`, {
     full_name: user?.full_name ?? "",
     email: user?.email ?? "",
     phone: user?.phone ?? "",
     bio: user?.bio ?? "",
     gender: user?.gender ?? "",
-    date_of_birth: user?.date_of_birth ?? "",
+    birth_month: user?.birth_month ? String(user.birth_month) : "",
+    birth_day: user?.birth_day ? String(user.birth_day) : "",
     fitness_goals: user?.fitness_goals ?? "",
   });
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -69,7 +71,8 @@ export function AccountPage() {
       phone: user.phone ?? "",
       bio: user.bio ?? "",
       gender: user.gender ?? "",
-      date_of_birth: user.date_of_birth ?? "",
+      birth_month: user.birth_month ? String(user.birth_month) : "",
+      birth_day: user.birth_day ? String(user.birth_day) : "",
       fitness_goals: user.fitness_goals ?? "",
     });
   }, [profileDraftRestored, setForm, user]);
@@ -113,7 +116,8 @@ export function AccountPage() {
       };
       if (isClient) {
         payload.gender = form.gender;
-        payload.date_of_birth = form.date_of_birth || null;
+        payload.birth_month = form.birth_month ? Number(form.birth_month) : null;
+        payload.birth_day = form.birth_day ? Number(form.birth_day) : null;
         payload.fitness_goals = form.fitness_goals;
       } else {
         payload.bio = form.bio;
@@ -258,8 +262,14 @@ export function AccountPage() {
                       <option value="PNS">Prefer not to say</option>
                     </Select>
                   </Field>
-                  <Field label="Date of birth">
-                    <Input type="date" value={form.date_of_birth} onChange={set("date_of_birth")} />
+                  <Field label="Birthday" hint="Day and month only">
+                    <BirthdayInput
+                      month={form.birth_month}
+                      day={form.birth_day}
+                      onChange={({ month, day }) =>
+                        setForm((value) => ({ ...value, birth_month: month, birth_day: day }))
+                      }
+                    />
                   </Field>
                   <Field label="Fitness goals" className="sm:col-span-2">
                     <Textarea

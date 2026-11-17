@@ -18,6 +18,8 @@ const trainer: User = {
   id: "trainer-1",
   email: "coach@example.com",
   full_name: "Coach",
+  first_name: "Coach",
+  last_name: "",
   display_name: "Coach",
   phone: "",
   role: "TRAINER",

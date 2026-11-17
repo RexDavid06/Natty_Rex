@@ -12,7 +12,7 @@ vi.mock("../../lib/api", () => ({
 
 vi.mock("../../lib/auth", () => ({
   useAuth: () => ({
-    user: { id: "u1", full_name: "Jamie Carter", display_name: "Jamie Carter", email: "jamie@example.com", phone: "", role: "CLIENT", avatar: null },
+    user: { id: "u1", full_name: "Jamie Carter", first_name: "Jamie", last_name: "Carter", display_name: "Jamie Carter", email: "jamie@example.com", phone: "", role: "CLIENT", avatar: null },
     initializing: false,
   }),
 }));

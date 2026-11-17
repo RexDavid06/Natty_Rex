@@ -67,11 +67,46 @@ class TrainerClientManagementTests(APITestCase):
         self.assertEqual(inactive.data["count"], 1)
         self.assertEqual(inactive.data["results"][0]["full_name"], "Inactive Person")
 
+    def test_create_client_with_separate_names_and_birthday(self):
+        response = self.client.post(
+            reverse("client-list"),
+            {
+                "first_name": "Jordan",
+                "last_name": "Blake",
+                "birth_month": 4,
+                "birth_day": 18,
+                "email": "jordan@example.com",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["first_name"], "Jordan")
+        self.assertEqual(response.data["last_name"], "Blake")
+        self.assertEqual(response.data["full_name"], "Jordan Blake")
+        self.assertEqual(response.data["birth_month"], 4)
+        self.assertEqual(response.data["birth_day"], 18)
+
+    def test_invalid_birthday_is_rejected(self):
+        response = self.client.post(
+            reverse("client-list"),
+            {
+                "first_name": "Jordan",
+                "birth_month": 2,
+                "birth_day": 30,
+                "email": "bad-birthday@example.com",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_update_client_profile(self):
         response = self.client.patch(
             reverse("client-detail", args=[self.client_profile.id]),
             {
-                "full_name": "Athlete Renamed",
+                "first_name": "Athlete",
+                "last_name": "Renamed",
+                "birth_month": 12,
+                "birth_day": 31,
                 "email": "renamed@example.com",
                 "training_notes": "Previous knee injury",
             },
@@ -79,6 +114,8 @@ class TrainerClientManagementTests(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["full_name"], "Athlete Renamed")
+        self.assertEqual(response.data["birth_month"], 12)
+        self.assertEqual(response.data["birth_day"], 31)
         self.assertEqual(response.data["email"], "renamed@example.com")
         self.client_profile.refresh_from_db()
         self.assertEqual(self.client_profile.training_notes, "Previous knee injury")

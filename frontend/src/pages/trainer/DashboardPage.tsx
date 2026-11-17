@@ -72,7 +72,7 @@ export function TrainerDashboardPage() {
     <div className="animate-fade-up">
       <PageHeader
         eyebrow={new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
-        title={`${greeting}, ${user?.full_name?.split(" ")[0] ?? "Coach"}.`}
+        title={`${greeting}, ${user?.first_name || user?.full_name?.split(" ")[0] || "Coach"}.`}
         subtitle="Your clients, training load and completion health at a glance."
         actions={
           <>

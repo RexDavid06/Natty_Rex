@@ -100,6 +100,65 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
   },
 );
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+export function BirthdayInput({
+  month,
+  day,
+  onChange,
+  className,
+}: {
+  month: string;
+  day: string;
+  onChange: (next: { month: string; day: string }) => void;
+  className?: string;
+}) {
+  const monthNumber = Number(month);
+  const maxDay =
+    monthNumber >= 1 && monthNumber <= 12
+      ? new Date(2000, monthNumber, 0).getDate()
+      : 31;
+  return (
+    <div className={cn("grid grid-cols-2 gap-3", className)}>
+      <Select
+        aria-label="Birth month"
+        value={month}
+        onChange={(event) => {
+          const nextMonth = event.target.value;
+          const nextMonthNumber = Number(nextMonth);
+          const nextMax =
+            nextMonthNumber >= 1 && nextMonthNumber <= 12
+              ? new Date(2000, nextMonthNumber, 0).getDate()
+              : 31;
+          onChange({
+            month: nextMonth,
+            day: day && Number(day) <= nextMax ? day : "",
+          });
+        }}
+      >
+        <option value="">Month</option>
+        {MONTH_NAMES.map((name, index) => (
+          <option key={name} value={String(index + 1)}>{name}</option>
+        ))}
+      </Select>
+      <Select
+        aria-label="Birth day"
+        value={day}
+        onChange={(event) => onChange({ month, day: event.target.value })}
+        disabled={!month}
+      >
+        <option value="">Day</option>
+        {Array.from({ length: maxDay }, (_, index) => String(index + 1)).map(
+          (value) => <option key={value} value={value}>{value}</option>,
+        )}
+      </Select>
+    </div>
+  );
+}
+
 export function Field({
   label,
   hint,

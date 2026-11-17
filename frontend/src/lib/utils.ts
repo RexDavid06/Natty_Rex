@@ -12,6 +12,13 @@ export function formatDate(value?: string | null, options?: Intl.DateTimeFormatO
   return date.toLocaleDateString(undefined, options ?? { month: "short", day: "numeric", year: "numeric" });
 }
 
+export function formatBirthday(month?: number | null, day?: number | null) {
+  if (!month || !day) return null;
+  const date = new Date(2000, month - 1, day);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString(undefined, { month: "long", day: "numeric" });
+}
+
 export function formatDateTime(value?: string | null) {
   if (!value) return "—";
   const date = new Date(value);

@@ -255,6 +255,8 @@ class ClientListCreateView(generics.ListCreateAPIView):
         if search:
             queryset = queryset.filter(
                 Q(user__full_name__icontains=search)
+                | Q(user__first_name__icontains=search)
+                | Q(user__last_name__icontains=search)
                 | Q(user__email__icontains=search)
                 | Q(user__phone__icontains=search)
             )
@@ -272,11 +274,14 @@ class ClientListCreateView(generics.ListCreateAPIView):
         try:
             client = create_client(
                 trainer=request.user,
-                full_name=data["full_name"],
+                full_name=data.get("full_name", ""),
+                first_name=data.get("first_name", ""),
+                last_name=data.get("last_name", ""),
                 email=data.get("email", ""),
                 phone=data.get("phone", ""),
                 gender=data.get("gender", ""),
-                date_of_birth=data.get("date_of_birth"),
+                birth_month=data.get("birth_month"),
+                birth_day=data.get("birth_day"),
                 fitness_goals=data.get("fitness_goals", ""),
                 training_notes=data.get("training_notes", ""),
             )

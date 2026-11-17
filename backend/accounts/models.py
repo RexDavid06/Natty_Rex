@@ -105,7 +105,8 @@ class ClientProfile(models.Model):
         limit_choices_to={"role": User.Role.TRAINER},
     )
     gender = models.CharField(max_length=10, choices=Gender.choices, blank=True)
-    date_of_birth = models.DateField(null=True, blank=True)
+    birth_month = models.PositiveSmallIntegerField(null=True, blank=True)
+    birth_day = models.PositiveSmallIntegerField(null=True, blank=True)
     fitness_goals = models.TextField(blank=True)
     training_notes = models.TextField(blank=True)
     avatar = models.FileField(upload_to="avatars/clients/", blank=True, null=True)

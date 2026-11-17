@@ -32,11 +32,15 @@ def absolute_media_url(request, file_field):
 
 
 def _parse_minutes(value) -> int | None:
-    """Parse a duration default like '20 min' / '20 minutes' into an int."""
+    """Parse a duration like '20', '20 min' or '1 hour' into minutes.
+
+    Seconds-based values are left alone so interval work such as jump rope keeps
+    its sets/reps prescription.
+    """
     if not value:
         return None
     text = str(value).strip().lower()
-    if "min" not in text:
+    if "sec" in text:
         return None
     digits = "".join(ch if ch.isdigit() else " " for ch in text).split()
     if not digits:

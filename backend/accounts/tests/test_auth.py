@@ -134,7 +134,8 @@ class SelfProfileUpdateTests(APITestCase):
                 "email": "renamed-self@example.com",
                 "phone": "+15551234567",
                 "gender": "FEMALE",
-                "date_of_birth": "1995-04-12",
+                "birth_month": 4,
+                "birth_day": 12,
                 "fitness_goals": "Run a marathon",
             },
             format="json",
@@ -143,7 +144,8 @@ class SelfProfileUpdateTests(APITestCase):
         self.assertEqual(response.data["full_name"], "Renamed Client")
         self.assertEqual(response.data["email"], "renamed-self@example.com")
         self.assertEqual(response.data["gender"], "FEMALE")
-        self.assertEqual(response.data["date_of_birth"], "1995-04-12")
+        self.assertEqual(response.data["birth_month"], 4)
+        self.assertEqual(response.data["birth_day"], 12)
         self.assertEqual(response.data["fitness_goals"], "Run a marathon")
 
         self.client_profile.refresh_from_db()

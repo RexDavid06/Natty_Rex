@@ -4,7 +4,7 @@ import { Check, Copy, MessageCircle, UserPlus } from "lucide-react";
 import { api, ApiError } from "../../lib/api";
 import { useToast } from "../../lib/toast";
 import type { Client, Invitation } from "../../lib/types";
-import { Avatar, Button, Field, Input, Modal, Select, Textarea } from "../ui";
+import { Avatar, BirthdayInput, Button, Field, Input, Modal, Select, Textarea } from "../ui";
 import { useDraftState } from "../../lib/persistence/usePersistentState";
 
 interface Props {
@@ -14,11 +14,13 @@ interface Props {
 }
 
 const emptyForm = {
-  full_name: "",
+  first_name: "",
+  last_name: "",
   phone: "",
   email: "",
   gender: "",
-  date_of_birth: "",
+  birth_month: "",
+  birth_day: "",
   fitness_goals: "",
   training_notes: "",
 };
@@ -70,7 +72,7 @@ export function AddClientModal({ open, onClose, onCreated }: Props) {
     value: form,
     setValue: setForm,
     clear: clearFormDraft,
-  } = useDraftState("trainer.add-client", emptyForm);
+  } = useDraftState("trainer.add-client.v2", emptyForm);
   const [created, setCreated] = useState<Client | null>(null);
   const { toast } = useToast();
 
@@ -79,7 +81,8 @@ export function AddClientModal({ open, onClose, onCreated }: Props) {
       api.post<Client>("/clients/", {
         ...form,
         gender: form.gender || undefined,
-        date_of_birth: form.date_of_birth || null,
+        birth_month: form.birth_month ? Number(form.birth_month) : null,
+        birth_day: form.birth_day ? Number(form.birth_day) : null,
         send_invitation: true,
       }),
     onSuccess: (client) => {
@@ -135,9 +138,14 @@ export function AddClientModal({ open, onClose, onCreated }: Props) {
           }}
           className="space-y-4"
         >
-          <Field label="Full name">
-            <Input value={form.full_name} onChange={set("full_name")} placeholder="Jordan Blake" required autoFocus />
-          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="First name">
+              <Input value={form.first_name} onChange={set("first_name")} placeholder="Jordan" required autoFocus />
+            </Field>
+            <Field label="Last name">
+              <Input value={form.last_name} onChange={set("last_name")} placeholder="Blake" />
+            </Field>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Phone">
               <Input value={form.phone} onChange={set("phone")} placeholder="+1 555 010 2030" inputMode="tel" />
@@ -155,8 +163,14 @@ export function AddClientModal({ open, onClose, onCreated }: Props) {
                 <option value="OTHER">Other</option>
               </Select>
             </Field>
-            <Field label="Date of birth" hint="Optional">
-              <Input type="date" value={form.date_of_birth} onChange={set("date_of_birth")} />
+            <Field label="Birthday" hint="Day and month only">
+              <BirthdayInput
+                month={form.birth_month}
+                day={form.birth_day}
+                onChange={({ month, day }) =>
+                  setForm((value) => ({ ...value, birth_month: month, birth_day: day }))
+                }
+              />
             </Field>
           </div>
           <Field label="Fitness goals">

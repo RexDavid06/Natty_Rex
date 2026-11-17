@@ -11,6 +11,7 @@ import { formatDate } from "../../lib/utils";
 interface Preview {
   valid: boolean;
   client_name: string;
+  client_first_name: string;
   email_required: boolean;
   expires_at: string;
 }
@@ -98,7 +99,7 @@ export function InvitePage() {
             <CheckCircle2 className="h-3 w-3" /> Invitation verified
           </Badge>
           <h1 className="mt-4 font-display text-2xl font-semibold">
-            Welcome, {preview.data?.client_name?.split(" ")[0]}.
+            Welcome, {preview.data?.client_first_name || preview.data?.client_name?.split(" ")[0]}.
           </h1>
           <p className="mt-1.5 text-sm leading-relaxed text-white/40">
             Create your password to activate your Nattyrex account. This invite expires{" "}

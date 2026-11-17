@@ -25,13 +25,27 @@ def is_placeholder_email(email: str) -> bool:
     return email.lower().endswith(f"@{PHONE_EMAIL_DOMAIN}")
 
 
+def split_full_name(value: str) -> tuple[str, str]:
+    parts = (value or "").strip().split(None, 1)
+    if not parts:
+        return "", ""
+    return parts[0], parts[1] if len(parts) > 1 else ""
+
+
 @transaction.atomic
 def create_client(
-    *, trainer, full_name, email="", phone="", gender="", date_of_birth=None,
-    fitness_goals="", training_notes="",
+    *, trainer, full_name="", first_name="", last_name="", email="", phone="",
+    gender="", birth_month=None, birth_day=None, fitness_goals="", training_notes="",
 ):
     if not email and not phone:
         raise ValueError("Provide an email address or phone number.")
+    first_name = (first_name or "").strip()
+    last_name = (last_name or "").strip()
+    if first_name or last_name:
+        full_name = " ".join(part for part in (first_name, last_name) if part)
+    elif full_name:
+        first_name, last_name = split_full_name(full_name)
+    full_name = (full_name or "").strip()
     email = (email or "").strip().lower()
     phone = (phone or "").strip()
     if email and User.objects.filter(email=email).exists():
@@ -41,7 +55,9 @@ def create_client(
     user = User.objects.create_user(
         email=email or placeholder_email(),
         password=None,
-        full_name=full_name.strip(),
+        full_name=full_name,
+        first_name=first_name,
+        last_name=last_name,
         phone=phone,
         role=User.Role.CLIENT,
     )
@@ -49,7 +65,8 @@ def create_client(
         user=user,
         trainer=trainer,
         gender=gender,
-        date_of_birth=date_of_birth,
+        birth_month=birth_month,
+        birth_day=birth_day,
         fitness_goals=fitness_goals,
         training_notes=training_notes,
     )

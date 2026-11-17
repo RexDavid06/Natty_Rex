@@ -28,6 +28,7 @@ import { PageHeader } from "../../components/layout/AppLayout";
 import {
   Avatar,
   Badge,
+  BirthdayInput,
   Button,
   Card,
   ConfirmDialog,
@@ -38,7 +39,7 @@ import {
   Skeleton,
 } from "../../components/ui";
 import { InviteLink } from "../../components/trainer/AddClientModal";
-import { cn, formatDate, formatDateTime, pluralize, titleCase } from "../../lib/utils";
+import { cn, formatBirthday, formatDate, formatDateTime, pluralize, titleCase } from "../../lib/utils";
 import { useDraftState, usePersistentState } from "../../lib/persistence/usePersistentState";
 
 const tabs = ["Overview", "Programs", "Progress", "Notes"] as const;
@@ -188,7 +189,9 @@ export function ClientDetailPage() {
                 </span>
               )}
               <span>Joined {formatDate(client.created_at)}</span>
-              {client.date_of_birth && <span>Born {formatDate(client.date_of_birth)}</span>}
+              {client.birth_month && client.birth_day && (
+                <span>Birthday {formatBirthday(client.birth_month, client.birth_day)}</span>
+              )}
             </div>
           </div>
           <button
@@ -534,12 +537,14 @@ function EditClientModal({ client, open, onClose, onSaved }: { client: Client; o
     setValue: setForm,
     restored: draftRestored,
     clear: clearFormDraft,
-  } = useDraftState(`trainer.client.${client.client_id}.edit`, {
-    full_name: client.full_name,
+  } = useDraftState(`trainer.client.${client.client_id}.edit.v2`, {
+    first_name: client.first_name,
+    last_name: client.last_name,
     email: client.email,
     phone: client.phone,
     gender: client.gender,
-    date_of_birth: client.date_of_birth ?? "",
+    birth_month: client.birth_month ? String(client.birth_month) : "",
+    birth_day: client.birth_day ? String(client.birth_day) : "",
     fitness_goals: client.fitness_goals,
     training_notes: client.training_notes,
   });
@@ -565,8 +570,11 @@ function EditClientModal({ client, open, onClose, onSaved }: { client: Client; o
         className="space-y-4"
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Full name">
-            <Input value={form.full_name} onChange={set("full_name")} required />
+          <Field label="First name">
+            <Input value={form.first_name} onChange={set("first_name")} required />
+          </Field>
+          <Field label="Last name">
+            <Input value={form.last_name} onChange={set("last_name")} />
           </Field>
           <Field label="Phone">
             <Input value={form.phone} onChange={set("phone")} />
@@ -574,8 +582,14 @@ function EditClientModal({ client, open, onClose, onSaved }: { client: Client; o
           <Field label="Email">
             <Input type="email" value={form.email} onChange={set("email")} />
           </Field>
-          <Field label="Date of birth" hint="Optional">
-            <Input type="date" value={form.date_of_birth ?? ""} onChange={set("date_of_birth")} />
+          <Field label="Birthday" hint="Day and month only">
+            <BirthdayInput
+              month={form.birth_month}
+              day={form.birth_day}
+              onChange={({ month, day }) =>
+                setForm((value) => ({ ...value, birth_month: month, birth_day: day }))
+              }
+            />
           </Field>
           <Field label="Gender">
             <Select value={form.gender} onChange={set("gender")}>

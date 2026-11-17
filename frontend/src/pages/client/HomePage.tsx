@@ -28,13 +28,6 @@ export function ClientHomePage() {
     queryFn: () => api.get<ClientDashboard>("/client/dashboard/"),
   });
 
-  const greeting = (() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  })();
-
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -61,7 +54,7 @@ export function ClientHomePage() {
             {today.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
           </p>
           <h1 className="mt-1 font-display text-2xl font-semibold sm:text-3xl">
-            {greeting}, {user?.full_name?.split(" ")[0]}.
+            Welcome, {user?.first_name || user?.full_name?.split(" ")[0]}.
           </h1>
         </div>
         {assignment && <Badge tone="lime">{assignment.program.name}</Badge>}
