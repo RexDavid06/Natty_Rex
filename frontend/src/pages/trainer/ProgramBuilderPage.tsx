@@ -482,8 +482,10 @@ function SortableExercise({ exercise, onEdit, onDelete }: { exercise: WorkoutExe
       <button onClick={onEdit} className="min-w-0 flex-1 text-left">
         <p className="truncate text-xs font-medium text-white/80">{exercise.exercise_name}</p>
         <p className="text-[10px] text-white/30">
-          {exercise.sets} × {exercise.reps}
-          {exercise.weight ? ` · ${exercise.weight} kg` : ""} · {exercise.rest_seconds}s rest
+          {exercise.is_duration_based
+            ? `${exercise.duration_minutes} min`
+            : `${exercise.sets} × ${exercise.reps}${exercise.weight ? ` · ${exercise.weight} kg` : ""}`}
+          {exercise.is_duration_based || !exercise.rest_seconds ? "" : ` · ${exercise.rest_seconds}s rest`}
         </p>
       </button>
       <Badge className="hidden sm:inline-flex">{titleCase(exercise.muscle_group)}</Badge>
@@ -789,6 +791,7 @@ function AddExerciseModal({ open, onClose, session, onSaved }: { open: boolean; 
     reps: "10",
     rest: "60",
     weight: "",
+    duration: "",
     custom: {
       exercise_name: "",
       muscle_group: "CHEST",
@@ -797,9 +800,10 @@ function AddExerciseModal({ open, onClose, session, onSaved }: { open: boolean; 
       sets: "3",
       reps: "10",
       rest_seconds: "60",
+      duration_minutes: "",
     },
   });
-  const { tab, search, selected, sets, reps, rest, weight, custom } = draft;
+  const { tab, search, selected, sets, reps, rest, weight, duration, custom } = draft;
   const setTab = (next: "library" | "custom") => setDraft((current) => ({ ...current, tab: next }));
   const setSearch = (next: string) => setDraft((current) => ({ ...current, search: next }));
   const setSelected = (next: string[] | ((current: string[]) => string[])) =>
@@ -811,6 +815,7 @@ function AddExerciseModal({ open, onClose, session, onSaved }: { open: boolean; 
   const setReps = (next: string) => setDraft((current) => ({ ...current, reps: next }));
   const setRest = (next: string) => setDraft((current) => ({ ...current, rest: next }));
   const setWeight = (next: string) => setDraft((current) => ({ ...current, weight: next }));
+  const setDuration = (next: string) => setDraft((current) => ({ ...current, duration: next }));
   const setCustom = (next: typeof custom) => setDraft((current) => ({ ...current, custom: next }));
 
   const { data, isLoading } = useQuery({
@@ -819,26 +824,42 @@ function AddExerciseModal({ open, onClose, session, onSaved }: { open: boolean; 
     enabled: open,
   });
 
+  const libraryExercises = data?.results ?? [];
+  const selectedExercises = libraryExercises.filter((exercise) => selected.includes(exercise.id));
+  const hasCardioSelected = selectedExercises.some((exercise) => exercise.default_duration_minutes != null);
+  const hasStrengthSelected = selectedExercises.some((exercise) => exercise.default_duration_minutes == null);
+
   const mutation = useMutation({
     mutationFn: async () => {
       if (tab === "custom") {
+        const isCardio = custom.category === "CARDIO";
         return api.post(`/sessions/${session.id}/exercises/`, {
           exercise_name: custom.exercise_name,
           muscle_group: custom.muscle_group,
           category: custom.category,
           instructions: custom.instructions,
-          sets: Number(custom.sets),
-          reps: custom.reps,
-          rest_seconds: Number(custom.rest_seconds),
+          ...(isCardio
+            ? { duration_minutes: Number(custom.duration_minutes) || null }
+            : {
+                sets: Number(custom.sets),
+                reps: custom.reps,
+                rest_seconds: Number(custom.rest_seconds),
+              }),
         });
       }
       for (const exerciseId of selected) {
+        const libraryExercise = libraryExercises.find((item) => item.id === exerciseId);
+        const isCardio = libraryExercise?.default_duration_minutes != null;
         await api.post(`/sessions/${session.id}/exercises/`, {
           exercise_id: exerciseId,
-          sets: Number(sets),
-          reps,
-          rest_seconds: Number(rest),
-          weight: weight ? Number(weight) : null,
+          ...(isCardio
+            ? { duration_minutes: duration ? Number(duration) : undefined }
+            : {
+                sets: Number(sets),
+                reps,
+                rest_seconds: Number(rest),
+                weight: weight ? Number(weight) : null,
+              }),
         });
       }
     },
@@ -882,7 +903,12 @@ function AddExerciseModal({ open, onClose, session, onSaved }: { open: boolean; 
                   />
                   <div className="min-w-0">
                     <p className="truncate text-[11px] font-medium text-white/80">{exercise.name}</p>
-                    <p className="text-[9px] text-white/30">{exercise.muscle_group_display} · {exercise.default_sets}×{exercise.default_reps}</p>
+                    <p className="text-[9px] text-white/30">
+                      {exercise.muscle_group_display} ·{" "}
+                      {exercise.category === "CARDIO" && exercise.default_duration_minutes
+                        ? `${exercise.default_duration_minutes} min`
+                        : `${exercise.default_sets}×${exercise.default_reps}`}
+                    </p>
                   </div>
                 </label>
               ))
@@ -891,11 +917,26 @@ function AddExerciseModal({ open, onClose, session, onSaved }: { open: boolean; 
             )}
           </div>
           {selected.length > 0 && (
-            <div className="grid grid-cols-2 gap-2 rounded-xl border border-lime-400/15 bg-lime-400/[0.03] p-3 sm:grid-cols-4">
-              <Field label="Sets"><Input type="number" min={1} value={sets} onChange={(e) => setSets(e.target.value)} /></Field>
-              <Field label="Reps"><Input value={reps} onChange={(e) => setReps(e.target.value)} /></Field>
-              <Field label="Rest (s)"><Input type="number" min={0} value={rest} onChange={(e) => setRest(e.target.value)} /></Field>
-              <Field label="Weight (kg)"><Input type="number" step="0.5" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="—" /></Field>
+            <div className="space-y-2 rounded-xl border border-lime-400/15 bg-lime-400/[0.03] p-3">
+              {hasCardioSelected && (
+                <Field label="Duration (minutes)" hint="Applied to the selected cardio exercises.">
+                  <Input
+                    type="number"
+                    min={1}
+                    value={duration}
+                    onChange={(e) => setDuration(e.target.value)}
+                    placeholder="e.g. 20"
+                  />
+                </Field>
+              )}
+              {hasStrengthSelected && (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <Field label="Sets"><Input type="number" min={1} value={sets} onChange={(e) => setSets(e.target.value)} /></Field>
+                  <Field label="Reps"><Input value={reps} onChange={(e) => setReps(e.target.value)} /></Field>
+                  <Field label="Rest (s)"><Input type="number" min={0} value={rest} onChange={(e) => setRest(e.target.value)} /></Field>
+                  <Field label="Weight (kg)"><Input type="number" step="0.5" value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="—" /></Field>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -916,11 +957,23 @@ function AddExerciseModal({ open, onClose, session, onSaved }: { open: boolean; 
               </Select>
             </Field>
           </div>
-          <div className="grid grid-cols-3 gap-3">
-            <Field label="Sets"><Input type="number" min={1} value={custom.sets} onChange={(event) => setCustom({ ...custom, sets: event.target.value })} /></Field>
-            <Field label="Reps"><Input value={custom.reps} onChange={(event) => setCustom({ ...custom, reps: event.target.value })} /></Field>
-            <Field label="Rest (s)"><Input type="number" min={0} value={custom.rest_seconds} onChange={(event) => setCustom({ ...custom, rest_seconds: event.target.value })} /></Field>
-          </div>
+          {custom.category === "CARDIO" ? (
+            <Field label="Duration (minutes)" hint="Cardio is prescribed by time instead of sets and reps.">
+              <Input
+                type="number"
+                min={1}
+                value={custom.duration_minutes}
+                onChange={(event) => setCustom({ ...custom, duration_minutes: event.target.value })}
+                placeholder="e.g. 20"
+              />
+            </Field>
+          ) : (
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="Sets"><Input type="number" min={1} value={custom.sets} onChange={(event) => setCustom({ ...custom, sets: event.target.value })} /></Field>
+              <Field label="Reps"><Input value={custom.reps} onChange={(event) => setCustom({ ...custom, reps: event.target.value })} /></Field>
+              <Field label="Rest (s)"><Input type="number" min={0} value={custom.rest_seconds} onChange={(event) => setCustom({ ...custom, rest_seconds: event.target.value })} /></Field>
+            </div>
+          )}
           <Field label="Instructions"><Textarea value={custom.instructions} onChange={(event) => setCustom({ ...custom, instructions: event.target.value })} placeholder="Technique cues and execution notes…" /></Field>
         </div>
       )}
@@ -930,7 +983,12 @@ function AddExerciseModal({ open, onClose, session, onSaved }: { open: boolean; 
         <Button
           onClick={() => mutation.mutate()}
           loading={mutation.isPending}
-          disabled={tab === "library" ? selected.length === 0 : !custom.exercise_name.trim()}
+          disabled={
+            tab === "library"
+              ? selected.length === 0
+              : !custom.exercise_name.trim() ||
+                (custom.category === "CARDIO" && !Number(custom.duration_minutes))
+          }
         >
           {tab === "library" ? `Add ${selected.length || ""} exercise${selected.length === 1 ? "" : "s"}` : "Add custom exercise"}
         </Button>
@@ -952,6 +1010,7 @@ function EditExerciseModal({ exercise, onClose, onSaved }: { exercise: WorkoutEx
     category: exercise.category || "STRENGTH",
     sets: String(exercise.sets),
     reps: exercise.reps,
+    duration_minutes: exercise.duration_minutes ? String(exercise.duration_minutes) : "",
     weight: exercise.weight ?? "",
     rest_seconds: String(exercise.rest_seconds),
     tempo: exercise.tempo,
@@ -962,6 +1021,7 @@ function EditExerciseModal({ exercise, onClose, onSaved }: { exercise: WorkoutEx
     mutationFn: () =>
       api.patch(`/workout-exercises/${exercise.id}/`, {
         ...form,
+        duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : null,
         sets: Number(form.sets),
         rest_seconds: Number(form.rest_seconds),
         weight: form.weight ? Number(form.weight) : null,
@@ -985,13 +1045,20 @@ function EditExerciseModal({ exercise, onClose, onSaved }: { exercise: WorkoutEx
             </Select>
           </Field>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <Field label="Sets"><Input type="number" min={1} value={form.sets} onChange={(e) => setForm({ ...form, sets: e.target.value })} /></Field>
-          <Field label="Reps"><Input value={form.reps} onChange={(e) => setForm({ ...form, reps: e.target.value })} /></Field>
-          <Field label="Weight"><Input type="number" step="0.5" value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} placeholder="—" /></Field>
-          <Field label="Rest (s)"><Input type="number" min={0} value={form.rest_seconds} onChange={(e) => setForm({ ...form, rest_seconds: e.target.value })} /></Field>
-          <Field label="Tempo"><Input value={form.tempo} onChange={(e) => setForm({ ...form, tempo: e.target.value })} placeholder="3-1-1" /></Field>
-        </div>
+        {exercise.is_duration_based || form.duration_minutes ? (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Duration (minutes)"><Input type="number" min={1} value={form.duration_minutes} onChange={(e) => setForm({ ...form, duration_minutes: e.target.value })} placeholder="e.g. 20" required /></Field>
+            <Field label="Rest (s)"><Input type="number" min={0} value={form.rest_seconds} onChange={(e) => setForm({ ...form, rest_seconds: e.target.value })} /></Field>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <Field label="Sets"><Input type="number" min={1} value={form.sets} onChange={(e) => setForm({ ...form, sets: e.target.value })} /></Field>
+            <Field label="Reps"><Input value={form.reps} onChange={(e) => setForm({ ...form, reps: e.target.value })} /></Field>
+            <Field label="Weight"><Input type="number" step="0.5" value={form.weight} onChange={(e) => setForm({ ...form, weight: e.target.value })} placeholder="—" /></Field>
+            <Field label="Rest (s)"><Input type="number" min={0} value={form.rest_seconds} onChange={(e) => setForm({ ...form, rest_seconds: e.target.value })} /></Field>
+            <Field label="Tempo"><Input value={form.tempo} onChange={(e) => setForm({ ...form, tempo: e.target.value })} placeholder="3-1-1" /></Field>
+          </div>
+        )}
         <Field label="Instructions"><Textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} /></Field>
         <Field label="Trainer notes"><Textarea value={form.trainer_notes} onChange={(e) => setForm({ ...form, trainer_notes: e.target.value })} className="min-h-[70px]" /></Field>
         <div className="flex items-center justify-between gap-2 border-t border-white/[0.06] pt-4">

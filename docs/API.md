@@ -106,7 +106,7 @@ Media fields: `kind` (`VIDEO`, `ANIMATION`, `IMAGE`), `title`, `description`, `f
 | POST | `/days/<id>/copy/` | `{ "source_day_id": "…" }` |
 | POST | `/days/<id>/sessions/` | Create session |
 | PATCH/DELETE | `/sessions/<id>/` | Update/delete session |
-| POST | `/sessions/<id>/exercises/` | Add library exercise (`exercise_id`) or custom (`exercise_name`, `muscle_group`, `sets`, `reps`, …) |
+| POST | `/sessions/<id>/exercises/` | Add library exercise (`exercise_id`) or custom (`exercise_name`, `muscle_group`, `sets`, `reps`, …); cardio uses `duration_minutes` instead of sets/reps |
 | POST | `/sessions/<id>/reorder/` | `{ "exercise_ids": [...] }` — every ID exactly once |
 | PATCH/DELETE | `/workout-exercises/<id>/` | Update/remove prescription |
 | DELETE | `/assignments/<id>/` | Cancel assignment |
@@ -141,7 +141,7 @@ All routes require the `CLIENT` role.
 | GET | `/client/calendar/?week=1&assignment=<id>` | Week day/session breakdown |
 | GET | `/client/sessions/<id>/` | Session detail with media and completion state |
 | POST | `/client/sessions/<id>/complete/` | Complete session (`notes`) after all exercises |
-| POST | `/client/exercises/<id>/complete/` | Log `actual_sets`, `actual_reps`, `actual_weight`, `notes` |
+| POST | `/client/exercises/<id>/complete/` | Log `actual_sets`, `actual_reps`, `actual_weight`, `notes`; cardio uses `actual_duration_minutes` |
 | DELETE | `/client/exercises/<id>/complete/` | Undo exercise while session is unfinished |
 | GET | `/client/history/` | Completed workouts |
 | GET/POST | `/client/progress/` | Read/create own progress entries |
@@ -154,6 +154,15 @@ Exercise logging body:
   "actual_reps": "6",
   "actual_weight": "102.5",
   "notes": "Felt strong, depth good"
+}
+```
+
+Cardio exercise logging body:
+
+```json
+{
+  "actual_duration_minutes": 20,
+  "notes": "Steady pace, incline 6"
 }
 ```
 

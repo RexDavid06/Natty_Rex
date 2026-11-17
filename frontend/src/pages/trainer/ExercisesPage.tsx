@@ -51,6 +51,7 @@ const emptyForm = {
   instructions: "",
   default_sets: 3,
   default_reps: "10",
+  default_duration_minutes: "",
   default_weight: "",
   default_rest_seconds: 60,
   tempo: "",
@@ -265,6 +266,7 @@ function ExerciseFormModal({
         instructions: exercise.instructions,
         default_sets: exercise.default_sets,
         default_reps: exercise.default_reps,
+        default_duration_minutes: exercise.default_duration_minutes ?? "",
         default_weight: exercise.default_weight ?? "",
         default_rest_seconds: exercise.default_rest_seconds,
         tempo: exercise.tempo,
@@ -279,7 +281,12 @@ function ExerciseFormModal({
 
   const saveMutation = useMutation({
     mutationFn: () => {
-      const payload = { ...form, default_weight: form.default_weight || null };
+      const payload = {
+        ...form,
+        default_duration_minutes:
+          form.default_duration_minutes === "" ? null : Number(form.default_duration_minutes),
+        default_weight: form.default_weight || null,
+      };
       return exercise ? api.patch(`/exercises/${exercise.id}/`, payload) : api.post("/exercises/", payload);
     },
     onSuccess: () => {
@@ -313,12 +320,27 @@ function ExerciseFormModal({
         </div>
         <Field label="Short description"><Textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="What the movement trains and why it matters." /></Field>
         <Field label="Coaching instructions"><Textarea value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} placeholder="Setup, execution, bracing cues, common mistakes…" /></Field>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <Field label="Sets"><Input type="number" min={1} value={form.default_sets} onChange={(e) => setForm({ ...form, default_sets: Number(e.target.value) })} /></Field>
-          <Field label="Reps"><Input value={form.default_reps} onChange={(e) => setForm({ ...form, default_reps: e.target.value })} /></Field>
-          <Field label="Weight"><Input type="number" step="0.5" value={form.default_weight} onChange={(e) => setForm({ ...form, default_weight: e.target.value })} placeholder="—" /></Field>
-          <Field label="Rest (s)"><Input type="number" min={0} value={form.default_rest_seconds} onChange={(e) => setForm({ ...form, default_rest_seconds: Number(e.target.value) })} /></Field>
-        </div>
+        {form.category === "CARDIO" ? (
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Default duration (minutes)" hint="Cardio exercises are prescribed by time.">
+              <Input
+                type="number"
+                min={1}
+                value={form.default_duration_minutes}
+                onChange={(e) => setForm({ ...form, default_duration_minutes: e.target.value })}
+                placeholder="20"
+              />
+            </Field>
+            <Field label="Rest (s)"><Input type="number" min={0} value={form.default_rest_seconds} onChange={(e) => setForm({ ...form, default_rest_seconds: Number(e.target.value) })} /></Field>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Field label="Sets"><Input type="number" min={1} value={form.default_sets} onChange={(e) => setForm({ ...form, default_sets: Number(e.target.value) })} /></Field>
+            <Field label="Reps"><Input value={form.default_reps} onChange={(e) => setForm({ ...form, default_reps: e.target.value })} /></Field>
+            <Field label="Weight"><Input type="number" step="0.5" value={form.default_weight} onChange={(e) => setForm({ ...form, default_weight: e.target.value })} placeholder="—" /></Field>
+            <Field label="Rest (s)"><Input type="number" min={0} value={form.default_rest_seconds} onChange={(e) => setForm({ ...form, default_rest_seconds: Number(e.target.value) })} /></Field>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-2 border-t border-white/[0.06] pt-4">
           <div>
             {restored && <Button type="button" variant="ghost" size="sm" onClick={clear}>Discard draft</Button>}

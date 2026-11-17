@@ -170,25 +170,40 @@ export function WorkoutPage() {
                     {exercise.is_completed && <CheckCircle2 className="h-5 w-5 shrink-0 text-lime-400" />}
                   </div>
 
-                  <div className="mt-3 grid grid-cols-3 gap-2">
-                    <div className="rounded-lg bg-white/[0.03] px-2 py-2 text-center">
-                      <p className="font-display text-sm font-semibold">{exercise.sets}</p>
-                      <p className="text-[9px] uppercase tracking-wide text-white/25">Sets</p>
+                  {exercise.is_duration_based ? (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <div className="rounded-lg bg-white/[0.03] px-2 py-2 text-center">
+                        <p className="font-display text-sm font-semibold">{exercise.duration_minutes} min</p>
+                        <p className="text-[9px] uppercase tracking-wide text-white/25">Duration</p>
+                      </div>
+                      <div className="rounded-lg bg-white/[0.03] px-2 py-2 text-center">
+                        <p className="font-display text-sm font-semibold">{exercise.rest_seconds ? `${exercise.rest_seconds}s` : "—"}</p>
+                        <p className="text-[9px] uppercase tracking-wide text-white/25">Rest</p>
+                      </div>
                     </div>
-                    <div className="rounded-lg bg-white/[0.03] px-2 py-2 text-center">
-                      <p className="font-display text-sm font-semibold">{exercise.reps}</p>
-                      <p className="text-[9px] uppercase tracking-wide text-white/25">Reps</p>
-                    </div>
-                    <div className="rounded-lg bg-white/[0.03] px-2 py-2 text-center">
-                      <p className="font-display text-sm font-semibold">{exercise.weight ? `${exercise.weight}kg` : "—"}</p>
-                      <p className="text-[9px] uppercase tracking-wide text-white/25">Weight</p>
-                    </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        <div className="rounded-lg bg-white/[0.03] px-2 py-2 text-center">
+                          <p className="font-display text-sm font-semibold">{exercise.sets}</p>
+                          <p className="text-[9px] uppercase tracking-wide text-white/25">Sets</p>
+                        </div>
+                        <div className="rounded-lg bg-white/[0.03] px-2 py-2 text-center">
+                          <p className="font-display text-sm font-semibold">{exercise.reps}</p>
+                          <p className="text-[9px] uppercase tracking-wide text-white/25">Reps</p>
+                        </div>
+                        <div className="rounded-lg bg-white/[0.03] px-2 py-2 text-center">
+                          <p className="font-display text-sm font-semibold">{exercise.weight ? `${exercise.weight}kg` : "—"}</p>
+                          <p className="text-[9px] uppercase tracking-wide text-white/25">Weight</p>
+                        </div>
+                      </div>
 
-                  <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-white/30">
-                    <span className="inline-flex items-center gap-1"><Timer className="h-3 w-3" /> {exercise.rest_seconds}s rest</span>
-                    {exercise.tempo && <span className="inline-flex items-center gap-1"><Clock3 className="h-3 w-3" /> Tempo {exercise.tempo}</span>}
-                  </div>
+                      <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-white/30">
+                        <span className="inline-flex items-center gap-1"><Timer className="h-3 w-3" /> {exercise.rest_seconds}s rest</span>
+                        {exercise.tempo && <span className="inline-flex items-center gap-1"><Clock3 className="h-3 w-3" /> Tempo {exercise.tempo}</span>}
+                      </div>
+                    </>
+                  )}
 
                   {exercise.trainer_notes && (
                     <div className="mt-3 flex gap-2 rounded-lg border border-lime-400/15 bg-lime-400/[0.04] px-2.5 py-2">
@@ -200,8 +215,11 @@ export function WorkoutPage() {
                   {exercise.is_completed && exercise.completion && (
                     <div className="mt-3 rounded-lg bg-lime-400/[0.05] px-3 py-2">
                       <p className="text-[10px] font-medium text-lime-300/80">
-                        Logged {exercise.completion.actual_sets ?? exercise.sets} × {exercise.completion.actual_reps || exercise.reps}
-                        {exercise.completion.actual_weight ? ` @ ${exercise.completion.actual_weight}kg` : ""}
+                        {exercise.is_duration_based
+                          ? `Logged ${exercise.completion.actual_duration_minutes ?? exercise.duration_minutes} min`
+                          : `Logged ${exercise.completion.actual_sets ?? exercise.sets} × ${exercise.completion.actual_reps || exercise.reps}${
+                              exercise.completion.actual_weight ? ` @ ${exercise.completion.actual_weight}kg` : ""
+                            }`}
                       </p>
                       {exercise.completion.notes && <p className="mt-0.5 text-[10px] text-white/35">{exercise.completion.notes}</p>}
                     </div>
@@ -304,15 +322,20 @@ function ExerciseCompleteModal({ exercise, onClose, onDone }: { exercise: Client
   } = useDraftState(`client.exercise.${exercise.id}.complete`, {
     sets: String(exercise.sets),
     reps: exercise.reps,
+    duration_minutes: exercise.duration_minutes ? String(exercise.duration_minutes) : "",
     weight: exercise.weight ?? "",
     notes: "",
   });
 
   const complete = useMutation({
     mutationFn: () => api.post(`/client/exercises/${exercise.id}/complete/`, {
-      actual_sets: Number(form.sets) || exercise.sets,
-      actual_reps: form.reps,
-      actual_weight: form.weight || null,
+      ...(exercise.is_duration_based
+        ? { actual_duration_minutes: Number(form.duration_minutes) || exercise.duration_minutes }
+        : {
+            actual_sets: Number(form.sets) || exercise.sets,
+            actual_reps: form.reps,
+            actual_weight: form.weight || null,
+          }),
       notes: form.notes,
     }),
     onSuccess: () => {
@@ -324,13 +347,34 @@ function ExerciseCompleteModal({ exercise, onClose, onDone }: { exercise: Client
   });
 
   return (
-    <Modal open onClose={onClose} title={exercise.exercise_name} description={`Prescribed: ${exercise.sets} × ${exercise.reps}${exercise.weight ? ` @ ${exercise.weight}kg` : ""}`}>
+    <Modal
+      open
+      onClose={onClose}
+      title={exercise.exercise_name}
+      description={
+        exercise.is_duration_based
+          ? `Prescribed: ${exercise.duration_minutes} min`
+          : `Prescribed: ${exercise.sets} × ${exercise.reps}${exercise.weight ? ` @ ${exercise.weight}kg` : ""}`
+      }
+    >
       <form onSubmit={(event) => { event.preventDefault(); complete.mutate(); }} className="space-y-4">
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="Sets done"><Input type="number" min={0} value={form.sets} onChange={(event) => setForm({ ...form, sets: event.target.value })} required /></Field>
-          <Field label="Reps"><Input value={form.reps} onChange={(event) => setForm({ ...form, reps: event.target.value })} required /></Field>
-          <Field label="Weight (kg)"><Input type="number" step="0.5" value={form.weight} onChange={(event) => setForm({ ...form, weight: event.target.value })} placeholder="—" /></Field>
-        </div>
+        {exercise.is_duration_based ? (
+          <Field label="Minutes completed">
+            <Input
+              type="number"
+              min={0}
+              value={form.duration_minutes}
+              onChange={(event) => setForm({ ...form, duration_minutes: event.target.value })}
+              required
+            />
+          </Field>
+        ) : (
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="Sets done"><Input type="number" min={0} value={form.sets} onChange={(event) => setForm({ ...form, sets: event.target.value })} required /></Field>
+            <Field label="Reps"><Input value={form.reps} onChange={(event) => setForm({ ...form, reps: event.target.value })} required /></Field>
+            <Field label="Weight (kg)"><Input type="number" step="0.5" value={form.weight} onChange={(event) => setForm({ ...form, weight: event.target.value })} placeholder="—" /></Field>
+          </div>
+        )}
         <Field label="Notes (optional)"><Textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder="How did it feel? Any form breakdown?" className="min-h-[72px]" /></Field>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>

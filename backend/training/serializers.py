@@ -31,6 +31,23 @@ def absolute_media_url(request, file_field):
     return request.build_absolute_uri(url) if request else url
 
 
+def _parse_minutes(value) -> int | None:
+    """Parse a duration default like '20 min' / '20 minutes' into an int."""
+    if not value:
+        return None
+    text = str(value).strip().lower()
+    if "min" not in text:
+        return None
+    digits = "".join(ch if ch.isdigit() else " " for ch in text).split()
+    if not digits:
+        return None
+    try:
+        minutes = int(digits[0])
+    except ValueError:
+        return None
+    return minutes or None
+
+
 class ExerciseMediaSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()
     thumbnail_url = serializers.SerializerMethodField()
@@ -69,14 +86,22 @@ class ExerciseSerializer(serializers.ModelSerializer):
         fields = [
             "id", "trainer", "name", "muscle_group", "muscle_group_display",
             "category", "category_display", "description", "instructions",
-            "default_sets", "default_reps", "default_weight",
-            "default_rest_seconds", "tempo", "animation_url", "media",
-            "is_archived", "created_at", "updated_at",
+            "default_sets", "default_reps", "default_duration_minutes",
+            "default_weight", "default_rest_seconds", "tempo", "animation_url",
+            "media", "is_archived", "created_at", "updated_at",
         ]
         read_only_fields = ["id", "trainer", "created_at", "updated_at"]
 
     def get_animation_url(self, obj) -> str | None:
         return absolute_media_url(self.context.get("request"), obj.animation)
+
+    def validate(self, attrs):
+        category = attrs.get("category", getattr(self.instance, "category", ""))
+        duration = attrs.get("default_duration_minutes")
+        if duration is None and category == Exercise.Category.CARDIO:
+            reps = attrs.get("default_reps", getattr(self.instance, "default_reps", ""))
+            attrs["default_duration_minutes"] = _parse_minutes(reps)
+        return attrs
 
 
 ALLOWED_MEDIA_TYPES = {
@@ -121,13 +146,15 @@ class WorkoutExerciseSerializer(serializers.ModelSerializer):
     muscle_group_display = serializers.CharField(
         source="get_muscle_group_display", read_only=True
     )
+    is_duration_based = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = WorkoutExercise
         fields = [
             "id", "exercise_id", "exercise_name", "muscle_group",
             "muscle_group_display", "category", "instructions", "trainer_notes",
-            "sets", "reps", "weight", "rest_seconds", "tempo", "order", "media",
+            "sets", "reps", "duration_minutes", "is_duration_based",
+            "weight", "rest_seconds", "tempo", "order", "media",
         ]
 
     def get_exercise_id(self, obj):
@@ -177,8 +204,8 @@ class WorkoutExerciseWriteSerializer(serializers.ModelSerializer):
         model = WorkoutExercise
         fields = [
             "exercise_id", "exercise_name", "muscle_group", "category",
-            "instructions", "trainer_notes", "sets", "reps", "weight",
-            "rest_seconds", "tempo",
+            "instructions", "trainer_notes", "sets", "reps", "duration_minutes",
+            "weight", "rest_seconds", "tempo",
         ]
 
     def validate(self, attrs):
@@ -214,6 +241,12 @@ class WorkoutExerciseWriteSerializer(serializers.ModelSerializer):
             validated_data.setdefault("weight", exercise.default_weight)
             validated_data.setdefault("rest_seconds", exercise.default_rest_seconds)
             validated_data.setdefault("tempo", exercise.tempo)
+            if exercise.category == Exercise.Category.CARDIO:
+                duration = exercise.default_duration_minutes or _parse_minutes(
+                    exercise.default_reps
+                )
+                if duration:
+                    validated_data.setdefault("duration_minutes", duration)
         return super().create(validated_data)
 
     def update(self, instance, validated_data):
@@ -373,7 +406,8 @@ class ExerciseCompletionSerializer(serializers.ModelSerializer):
         model = ExerciseCompletion
         fields = [
             "id", "workout_exercise", "exercise_name", "completed_at",
-            "actual_sets", "actual_reps", "actual_weight", "notes",
+            "actual_sets", "actual_reps", "actual_duration_minutes",
+            "actual_weight", "notes",
         ]
         read_only_fields = ["id", "completed_at", "exercise_name"]
 

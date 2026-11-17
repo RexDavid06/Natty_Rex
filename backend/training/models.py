@@ -50,6 +50,7 @@ class Exercise(models.Model):
     instructions = models.TextField(blank=True)
     default_sets = models.PositiveSmallIntegerField(default=3)
     default_reps = models.CharField(max_length=40, default="10")
+    default_duration_minutes = models.PositiveIntegerField(null=True, blank=True)
     default_weight = models.DecimalField(
         max_digits=7, decimal_places=2, null=True, blank=True
     )
@@ -285,6 +286,7 @@ class WorkoutExercise(models.Model):
     trainer_notes = models.TextField(blank=True)
     sets = models.PositiveSmallIntegerField(default=3)
     reps = models.CharField(max_length=40, default="10")
+    duration_minutes = models.PositiveIntegerField(null=True, blank=True)
     weight = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
     rest_seconds = models.PositiveIntegerField(default=60)
     tempo = models.CharField(max_length=40, blank=True)
@@ -297,6 +299,10 @@ class WorkoutExercise(models.Model):
 
     def __str__(self):
         return self.exercise_name
+
+    @property
+    def is_duration_based(self) -> bool:
+        return bool(self.duration_minutes)
 
     def apply_exercise_snapshot(self):
         if self.exercise:
@@ -329,6 +335,7 @@ class ExerciseCompletion(models.Model):
     completed_at = models.DateTimeField(auto_now_add=True)
     actual_sets = models.PositiveSmallIntegerField(null=True, blank=True)
     actual_reps = models.CharField(max_length=60, blank=True)
+    actual_duration_minutes = models.PositiveIntegerField(null=True, blank=True)
     actual_weight = models.DecimalField(
         max_digits=7, decimal_places=2, null=True, blank=True
     )

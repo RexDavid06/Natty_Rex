@@ -1201,6 +1201,7 @@ class ClientSessionDetailView(APIView):
                     "completed_at": completion.completed_at,
                     "actual_sets": completion.actual_sets,
                     "actual_reps": completion.actual_reps,
+                    "actual_duration_minutes": completion.actual_duration_minutes,
                     "actual_weight": str(completion.actual_weight)
                     if completion.actual_weight is not None
                     else None,
@@ -1253,6 +1254,7 @@ class CompleteExerciseView(APIView):
                 workout_exercise=exercise,
                 actual_sets=request.data.get("actual_sets"),
                 actual_reps=request.data.get("actual_reps", ""),
+                actual_duration_minutes=request.data.get("actual_duration_minutes") or None,
                 actual_weight=request.data.get("actual_weight") or None,
                 notes=request.data.get("notes", ""),
             )

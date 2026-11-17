@@ -141,7 +141,7 @@ def assign_program(program: WorkoutProgram, client: ClientProfile, trainer):
 @transaction.atomic
 def complete_exercise(
     *, client: ClientProfile, workout_exercise: WorkoutExercise, actual_sets=None,
-    actual_reps="", actual_weight=None, notes="",
+    actual_reps="", actual_duration_minutes=None, actual_weight=None, notes="",
 ):
     session = workout_exercise.session
     program = session.day.week.program
@@ -158,6 +158,7 @@ def complete_exercise(
             "session": session,
             "actual_sets": actual_sets,
             "actual_reps": actual_reps or "",
+            "actual_duration_minutes": actual_duration_minutes,
             "actual_weight": actual_weight,
             "notes": notes or "",
         },
@@ -165,10 +166,14 @@ def complete_exercise(
     if not created:
         completion.actual_sets = actual_sets
         completion.actual_reps = actual_reps or completion.actual_reps
+        completion.actual_duration_minutes = actual_duration_minutes
         completion.actual_weight = actual_weight
         completion.notes = notes or completion.notes
         completion.save(
-            update_fields=["actual_sets", "actual_reps", "actual_weight", "notes"]
+            update_fields=[
+                "actual_sets", "actual_reps", "actual_duration_minutes",
+                "actual_weight", "notes",
+            ]
         )
     return completion, created
 

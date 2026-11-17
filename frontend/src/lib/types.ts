@@ -86,6 +86,7 @@ export interface Exercise {
   instructions: string;
   default_sets: number;
   default_reps: string;
+  default_duration_minutes: number | null;
   default_weight: string | null;
   default_rest_seconds: number;
   tempo: string;
@@ -107,6 +108,8 @@ export interface WorkoutExercise {
   trainer_notes: string;
   sets: number;
   reps: string;
+  duration_minutes: number | null;
+  is_duration_based: boolean;
   weight: string | null;
   rest_seconds: number;
   tempo: string;
@@ -250,6 +253,7 @@ export interface CompletionInfo {
   completed_at: string;
   actual_sets: number | null;
   actual_reps: string;
+  actual_duration_minutes: number | null;
   actual_weight: string | null;
   notes: string;
 }
