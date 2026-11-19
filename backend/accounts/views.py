@@ -1,4 +1,5 @@
 from django.contrib.auth import logout as django_logout
+from django.utils import timezone
 from rest_framework import generics, permissions, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
@@ -166,12 +167,34 @@ class InvitationPreviewView(APIView):
             .filter(token_hash=hash_invitation_token(raw_token))
             .first()
         )
-        if not invitation or not invitation.is_valid:
+        if not invitation:
             return Response(
-                {"detail": "This invitation is invalid or has expired.",
-                 "valid": False},
+                {
+                    "detail": "This invitation link is invalid. Ask your trainer for a new link.",
+                    "valid": False,
+                    "reason": "invalid",
+                },
                 status=status.HTTP_404_NOT_FOUND,
             )
+        if invitation.expires_at <= timezone.now():
+            reason = "expired"
+            detail = "Invite link expired. Ask your trainer for a new link."
+        elif invitation.revoked_at is not None:
+            reason = "revoked"
+            detail = "This invitation was cancelled. Ask your trainer for a new link."
+        elif invitation.used_at is not None:
+            reason = "used"
+            detail = "This invitation has already been used. Sign in or ask your trainer for help."
+        else:
+            reason = None
+            detail = ""
+
+        if reason:
+            return Response(
+                {"detail": detail, "valid": False, "reason": reason},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
         from .services import is_placeholder_email
 
         return Response(

@@ -16,6 +16,37 @@ interface Preview {
   expires_at: string;
 }
 
+interface PreviewError {
+  reason?: string;
+  detail?: string;
+}
+
+const unavailableCopy: Record<string, { title: string; message: string }> = {
+  expired: {
+    title: "Invite link expired",
+    message: "This invite link has expired. Ask your trainer for a new link.",
+  },
+  revoked: {
+    title: "Invitation cancelled",
+    message: "This invitation was cancelled. Ask your trainer for a new link.",
+  },
+  used: {
+    title: "Invitation already used",
+    message: "This invitation has already been used. Sign in or ask your trainer for help.",
+  },
+  invalid: {
+    title: "Invitation unavailable",
+    message: "This invitation link is invalid. Ask your trainer for a new link.",
+  },
+};
+
+function getPreviewError(error: unknown): PreviewError | undefined {
+  if (!(error instanceof ApiError) || !error.data || typeof error.data !== "object") {
+    return undefined;
+  }
+  return error.data as PreviewError;
+}
+
 export function InvitePage() {
   const { token = "" } = useParams();
   const navigate = useNavigate();
@@ -32,7 +63,10 @@ export function InvitePage() {
     queryFn: () => apiFetch<Preview>(`/auth/invitations/preview/?token=${encodeURIComponent(token)}`, { anonymous: true }),
     retry: false,
   });
-  const invalid = preview.isError || preview.data?.valid === false;
+  const previewError = getPreviewError(preview.error);
+  const unavailableReason = preview.data?.reason ?? previewError?.reason;
+  const unavailable = preview.isError || preview.data?.valid === false;
+  const unavailableMessage = unavailableCopy[unavailableReason ?? "invalid"] ?? unavailableCopy.invalid;
 
   useEffect(() => {
     if (preview.data?.email_required) setEmail("");
@@ -70,17 +104,15 @@ export function InvitePage() {
     );
   }
 
-  if (invalid) {
+  if (unavailable) {
     return (
       <AuthLayout>
         <div className="surface p-7 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-400/10 text-red-300">
             <ShieldCheck className="h-6 w-6" />
           </div>
-          <h1 className="font-display text-xl font-semibold">Invitation unavailable</h1>
-          <p className="mt-2 text-sm leading-relaxed text-white/40">
-            This invitation is invalid, expired, or has already been used. Ask your trainer for a new link.
-          </p>
+          <h1 className="font-display text-xl font-semibold">{unavailableMessage.title}</h1>
+          <p className="mt-2 text-sm leading-relaxed text-white/40">{unavailableMessage.message}</p>
           <Link to="/login">
             <Button variant="secondary" className="mt-6">
               Go to sign in
